@@ -48,6 +48,7 @@ cc_library(
 cc_test(
     name = "audio_preprocessor_test",
     srcs = ["audio_preprocessor_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":audio_preprocessor",
         "@com_google_googletest//:gtest_main",
@@ -98,6 +99,7 @@ cc_test(
     data = [
         "//runtime/components/testdata",
     ],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":audio_preprocessor",
         ":audio_preprocessor_miniaudio",
@@ -205,6 +207,7 @@ cc_library(
 cc_test(
     name = "image_preprocessor_test",
     srcs = ["image_preprocessor_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":image_preprocessor",
         "@com_google_googletest//:gtest_main",
@@ -243,6 +246,7 @@ cc_library(
 cc_test(
     name = "by_pass_audio_preprocessor_test",
     srcs = ["by_pass_audio_preprocessor_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":by_pass_audio_preprocessor",
         "@com_google_googletest//:gtest_main",
@@ -281,6 +285,7 @@ cc_library(
 cc_test(
     name = "by_pass_image_preprocessor_test",
     srcs = ["by_pass_image_preprocessor_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":by_pass_image_preprocessor",
         "@com_google_googletest//:gtest_main",

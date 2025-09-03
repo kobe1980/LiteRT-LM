@@ -102,10 +102,18 @@ cc_test(
 )
 
 cc_library(
+    name = "default_static_gpu_accelerator",
+    deps = select({
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
     name = "llm_litert_compiled_model_executor",
     srcs = ["llm_litert_compiled_model_executor.cc"],
     hdrs = ["llm_litert_compiled_model_executor.h"],
     deps = [
+        ":default_static_gpu_accelerator",  # buildcleaner: keep
         ":executor_settings_base",
         ":litert_compiled_model_executor_utils",
         ":llm_executor",
@@ -152,10 +160,6 @@ cc_library(
             "@litert//litert/cc/internal:litert_options",
             "@litert//litert/cc/internal:litert_runtime_options",
             "@litert//litert/cc/internal:litert_tensor_buffer",
-        ],
-    }) + select({
-        "//conditions:default": [
-            "@litert//litert/c/internal:litert_tensor_buffer_registry",  # buildcleaner: keep
         ],
     }),
 )
@@ -212,6 +216,7 @@ cc_library(
 cc_test(
     name = "fake_llm_executor_test",
     srcs = ["fake_llm_executor_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":fake_llm_executor",
         ":llm_executor_io_types",

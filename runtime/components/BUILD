@@ -66,6 +66,7 @@ cc_library(
 cc_test(
     name = "tokenizer_test",
     srcs = ["tokenizer_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":tokenizer",
         "@com_google_googletest//:gtest_main",
@@ -396,6 +397,7 @@ cc_test(
 cc_test(
     name = "sampler_factory_failed_dlopen_test",
     srcs = ["sampler_factory_failed_dlopen_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":sampler_factory",
         ":top_p_cpu_sampler",

@@ -68,6 +68,7 @@ cc_library(
 cc_test(
     name = "io_types_test",
     srcs = ["io_types_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":io_types",
         "@com_google_googletest//:gtest_main",

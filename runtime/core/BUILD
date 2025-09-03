@@ -62,6 +62,7 @@ cc_test(
     # The LiteRT GPU path is not ready yet. Only test the CPU path.
     args = ["--gunit_filter=-EngineTest.CreateEngineGPU*"],
     data = ["//runtime/testdata"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":engine_impl",  # buildcleaner: keep
         "@com_google_googletest//:gtest_main",
@@ -172,6 +173,7 @@ cc_test(
     name = "session_basic_test",
     srcs = ["session_basic_test.cc"],
     data = ["//runtime/components/testdata"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":session_basic",
         "@com_google_googletest//:gtest_main",

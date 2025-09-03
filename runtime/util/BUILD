@@ -50,6 +50,7 @@ cc_library(
 cc_test(
     name = "convert_tensor_buffer_test",
     srcs = ["convert_tensor_buffer_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":convert_tensor_buffer",
         "@com_google_googletest//:gtest_main",
@@ -232,6 +233,7 @@ cc_library(
 cc_test(
     name = "tensor_buffer_util_test",
     srcs = ["tensor_buffer_util_test.cc"],
+    tags = ["requires-mac-inputs:hard"],  # Required for running on Forge on Mac.
     deps = [
         ":convert_tensor_buffer",
         ":tensor_buffer_util",
