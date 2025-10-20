@@ -173,9 +173,9 @@ TEST_F(PipelineTest, Decode) {
   constexpr int kNumOutputCandidates = 1;
   StopTokenDetector stop_token_detector(kNumOutputCandidates);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({2294}));
-  auto responses = Decode(*executor_, *tokenizer_, stop_token_detector,
-                          kNumOutputCandidates, /*constraint=*/nullptr,
-                          benchmark_info);
+  auto responses =
+      Decode(*executor_, *tokenizer_, stop_token_detector, kNumOutputCandidates,
+             /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
   // The response is " How's it going?" since "!" is the stop token which is
   // not included in the response.
@@ -189,9 +189,9 @@ TEST_F(PipelineTest, DecodeWithTwoStopTokens) {
   constexpr int kNumOutputCandidates = 1;
   StopTokenDetector stop_token_detector(kNumOutputCandidates);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({2295, 2294}));
-  auto responses = Decode(*executor_, *tokenizer_, stop_token_detector,
-                          kNumOutputCandidates, /*constraint=*/nullptr,
-                          benchmark_info);
+  auto responses =
+      Decode(*executor_, *tokenizer_, stop_token_detector, kNumOutputCandidates,
+             /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
   // The response is " How's it going" since "?!" is the stop token which is
   // not included in the response.
@@ -205,9 +205,9 @@ TEST_F(PipelineTest, DecodeReachMaxNumTokens) {
   constexpr int kNumOutputCandidates = 1;
   StopTokenDetector stop_token_detector(kNumOutputCandidates);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({2294}));
-  auto responses = Decode(*executor_, *tokenizer_, stop_token_detector,
-                          kNumOutputCandidates, /*constraint=*/nullptr,
-                          benchmark_info);
+  auto responses =
+      Decode(*executor_, *tokenizer_, stop_token_detector, kNumOutputCandidates,
+             /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
   // The response is truncated at the max number of tokens.
   EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's");
@@ -221,17 +221,17 @@ TEST_F(PipelineTest, DecodeWithMultipleOutputCandidates) {
       {2, 90, 547, 58, 735, 210, 466, 2294}};
   // "How's it going?", "Hello World", "How's it going?"
   std::vector<std::vector<int>> decode_tokens = {
-        {224, 90, 224},  {24, 547, 24}, {8, 58, 8},         {66, 735, 66},
-        {246, 210, 246}, {18, 466, 18}, {2295, 2294, 2295}, {2294, 0, 2294}};
+      {224, 90, 224},  {24, 547, 24}, {8, 58, 8},         {66, 735, 66},
+      {246, 210, 246}, {18, 466, 18}, {2295, 2294, 2295}, {2294, 0, 2294}};
   executor_ = std::make_unique<FakeLlmExecutor>(
       /*vocab_size=*/2560, prefill_tokens, decode_tokens, kNumOutputCandidates);
 
   std::optional<BenchmarkInfo> benchmark_info;
   StopTokenDetector stop_token_detector(kNumOutputCandidates);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({2294}));
-  auto responses = Decode(*executor_, *tokenizer_, stop_token_detector,
-                          kNumOutputCandidates, /*constraint=*/nullptr,
-                          benchmark_info);
+  auto responses =
+      Decode(*executor_, *tokenizer_, stop_token_detector, kNumOutputCandidates,
+             /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
   EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it going?");
   EXPECT_EQ(*(responses->GetResponseTextAt(1)), " Hello World");
@@ -260,8 +260,8 @@ TEST_F(PipelineTest, DecodeWithConstrainedDecoding) {
   StopTokenDetector stop_token_detector(kNumOutputCandidates);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
   auto responses =
-      Decode(*executor, *tokenizer_, stop_token_detector,
-             kNumOutputCandidates, constraint.get(), benchmark_info);
+      Decode(*executor, *tokenizer_, stop_token_detector, kNumOutputCandidates,
+             constraint.get(), benchmark_info);
   EXPECT_OK(responses);
   EXPECT_EQ(responses->GetNumOutputCandidates(), 1);
   EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it");
@@ -368,9 +368,9 @@ TEST_F(PipelineTest, DecodeBytePairEncodingTokens) {
   constexpr int kNumOutputCandidates = 1;
   StopTokenDetector stop_token_detector(kNumOutputCandidates);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({2294}));
-  auto responses = Decode(*executor_, *tokenizer, stop_token_detector,
-                          kNumOutputCandidates, /*constraint=*/nullptr,
-                          benchmark_info);
+  auto responses =
+      Decode(*executor_, *tokenizer, stop_token_detector, kNumOutputCandidates,
+             /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
   // The response is " How's it going?" since "!" is the stop token which is
   // not included in the response.
@@ -394,9 +394,9 @@ TEST_F(PipelineTest, DecodeStopTokenIsPartialBytePairEncodingTokens) {
   constexpr int kNumOutputCandidates = 1;
   StopTokenDetector stop_token_detector(kNumOutputCandidates);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({224, 24}));
-  auto responses = Decode(*executor_, *tokenizer, stop_token_detector,
-                          kNumOutputCandidates, /*constraint=*/nullptr,
-                          benchmark_info);
+  auto responses =
+      Decode(*executor_, *tokenizer, stop_token_detector, kNumOutputCandidates,
+             /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
   // Empty response as the stop token is encoded as a partial byte pair encoding
   // token.
@@ -412,25 +412,23 @@ class PipelineCustomSamplingTest : public testing::Test {
             .string());
     ASSERT_OK(tokenizer);
     tokenizer_ = std::move(*tokenizer);
-    // The prefill tokens are the expected tokens that will be passed in at each
-    // time the Prefill function is called. The values are the token ids of the
-    // input prompt "Hello World!" prepended with the bos token id (2).
-    std::vector<std::vector<int>> prefill_tokens = {
-        {2, 90, 547, 58, 735, 210, 466, 2294}};
-    // The decode tokens are the expected tokens that will be returned by the
-    // Decode function. The two values are the token ids of the output
-    // responses " How's it going?!" and " Hello World!" followed by the stop
-    // token id (0).
-    std::vector<std::vector<int>> decode_tokens = {
-        {224, 90}, {24, 547},    {8, 58},   {66, 735}, {246, 210},
-        {18, 466}, {2295, 2294}, {2294, 0}, {0, 0}};
-    // Vocab size needs to at least be larger than the largest token id 2294.
-    executor_ = std::make_unique<FakeLlmExecutor>(
-        /*vocab_size=*/2560, prefill_tokens, decode_tokens, /*batch_size=*/2);
+  }
+
+  FakeLlmExecutor CreateFakeLlmExecutor(
+      // The expected prefill tokens that after stop tokens are found in
+      // decoding with CustomSampling. That is, the last sampled tokens at
+      // stop condition.
+      const std::vector<std::vector<int>>& prefill_tokens = {},
+      // The expected decode tokens that will be returned by the Decode
+      // function.
+      const std::vector<std::vector<int>>& decode_tokens = {},
+      // Vocab size needs to at least be larger than the largest token id 2294.
+      int vocab_size = 2560, int batch_size = 2) {
+    return FakeLlmExecutor(vocab_size, prefill_tokens, decode_tokens,
+                           batch_size);
   }
 
   std::unique_ptr<Tokenizer> tokenizer_;
-  std::unique_ptr<FakeLlmExecutor> executor_;
 };
 
 TEST_F(PipelineCustomSamplingTest, Prefill) {
@@ -445,16 +443,22 @@ TEST_F(PipelineCustomSamplingTest, Prefill) {
   ExecutorTextData text_data(std::move(token_ids_buffer));
   ExecutorInputs inputs(std::move(text_data), std::nullopt, std::nullopt);
 
+  auto executor = CreateFakeLlmExecutor(
+      // "Hello World!" prepended with the bos token id (2).
+      /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}});
   auto last_prefill_token_id =
-      Prefill(*executor_, inputs,
+      Prefill(executor, inputs,
               /*wait_for_completion=*/true, benchmark_info);
   EXPECT_OK(last_prefill_token_id.status());
   EXPECT_EQ(*last_prefill_token_id, 2294);
 }
 
 TEST_F(PipelineCustomSamplingTest, PrefillTooLong) {
+  auto executor = CreateFakeLlmExecutor(
+      // "Hello World!" prepended with the bos token id (2).
+      /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}});
   // Set the max number of tokens to 3.
-  executor_->GetMutableExecutorSettings().value()->SetMaxNumTokens(3);
+  executor.GetMutableExecutorSettings().value()->SetMaxNumTokens(3);
   const std::string prompt = "Hello World!";
   std::optional<BenchmarkInfo> benchmark_info;
   ASSERT_OK_AND_ASSIGN(std::vector<int> token_ids,
@@ -467,7 +471,7 @@ TEST_F(PipelineCustomSamplingTest, PrefillTooLong) {
   ExecutorInputs inputs(std::move(text_data), std::nullopt, std::nullopt);
 
   auto last_prefill_token_id =
-      Prefill(*executor_, inputs,
+      Prefill(executor, inputs,
               /*wait_for_completion=*/true, benchmark_info);
   EXPECT_THAT(last_prefill_token_id,
               StatusIs(absl::StatusCode::kInvalidArgument));
@@ -483,8 +487,26 @@ TEST_F(PipelineCustomSamplingTest, DecodeCustomSampling) {
   std::optional<BenchmarkInfo> benchmark_info;
   StopTokenDetector stop_token_detector(2);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
+
+  auto executor = CreateFakeLlmExecutor(
+      // The expected prefill tokens that after stop tokens are found in
+      // decoding with CustomSampling. That is, the last sampled tokens at stop
+      // condition.
+      /*prefill_tokens=*/{{0, 0}},
+      // " How's it going?!" and " Hello World!" followed by the stop token id
+      // (0).
+      /*decode_tokens=*/{{224, 90},
+                         {24, 547},
+                         {8, 58},
+                         {66, 735},
+                         {246, 210},
+                         {18, 466},
+                         {2295, 2294},
+                         {2294, 0},
+                         {0, 0}});
+
   auto responses =
-      DecodeCustomSampling(*executor_, *tokenizer_, stop_token_detector,
+      DecodeCustomSampling(executor, *tokenizer_, stop_token_detector,
                            /*num_output_candidates=*/2, *sampler, *decoded_ids,
                            /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
@@ -511,15 +533,25 @@ TEST_F(PipelineCustomSamplingTest,
   auto constraint = std::make_unique<FakeConstraint>(expected_token_ids,
                                                      /*vocabulary_size=*/2560);
 
-  std::vector<std::vector<int>> prefill_tokens = {{2, 224}};
-  // The decode tokens are the expected tokens that will be returned by the
-  // Decode function. The decoded tokens are " How's it going?!"
-  std::vector<std::vector<int>> decode_tokens = {
-      {224, 224}, {24, 24},     {8, 8},       {66, 66}, {246, 246},
-      {18, 18},   {2295, 2295}, {2294, 2294}, {0, 0}};
   // Vocab size needs to at least be larger than the largest token id 2294.
-  auto executor = std::make_unique<FakeLlmExecutor>(
-      /*vocab_size=*/2560, prefill_tokens, decode_tokens, /*batch_size=*/2);
+  auto executor = CreateFakeLlmExecutor(
+      // The expected prefill tokens that after stop tokens are found in
+      // decoding with CustomSampling. That is, the last sampled tokens at stop
+      // condition.
+      /*prefill_tokens=*/{{0, 0}},
+      // " How's it going?!" for both two batches because the constraint is
+      // applied.
+      /*decode_tokens=*/{{224, 224},
+                         {24, 24},
+                         {8, 8},
+                         {66, 66},
+                         {246, 246},
+                         {18, 18},
+                         {2295, 2295},
+                         {2294, 2294},
+                         {0, 0}}
+
+  );
 
   auto decoded_ids = CreateTensorBuffer<int>({2, 1});
   // Populate with the last pre-filled token.
@@ -528,7 +560,7 @@ TEST_F(PipelineCustomSamplingTest,
   StopTokenDetector stop_token_detector(2);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
   auto responses =
-      DecodeCustomSampling(*executor, *tokenizer_, stop_token_detector,
+      DecodeCustomSampling(executor, *tokenizer_, stop_token_detector,
                            /*num_output_candidates=*/2, *sampler, *decoded_ids,
                            /*constraint=*/constraint.get(), benchmark_info);
   EXPECT_OK(responses);
@@ -538,18 +570,18 @@ TEST_F(PipelineCustomSamplingTest,
 }
 
 TEST_F(PipelineCustomSamplingTest, ScoreCustomSamplingSingleBatch) {
-  const std::vector<std::vector<int>> decode_tokens = {
-      {90}, {547}, {58}, {735}, {210}, {466}, {2294}, {0}};
-  auto executor = std::make_unique<FakeLlmExecutor>(
-      /*vocab_size=*/2560,
-      /*prefill_tokens=*/std::vector<std::vector<int>>{}, decode_tokens,
-      /*batch_size=*/1);
   auto decoded_ids = CreateTensorBuffer<int>(/*dimensions=*/{1, 1});
   StopTokenDetector stop_token_detector(/*batch_size=*/1);
   auto status = stop_token_detector.AddStopTokenSequence(/*stop_sequence=*/{0});
   ASSERT_OK(status);
+  auto executor = CreateFakeLlmExecutor(
+      /*prefill_tokens=*/{{}},
+      /*decode_tokens=*/{{90}, {547}, {58}, {735}, {210}, {466}, {2294}, {0}},
+      /*vocab_size=*/2560,
+      /*batch_size=*/1);
+
   auto responses = ScoreCustomSampling(
-      *executor, *tokenizer_, std::vector<absl::string_view>{"Hello World!"},
+      executor, *tokenizer_, std::vector<absl::string_view>{"Hello World!"},
       1.0f, *decoded_ids);
   ASSERT_OK(responses);
   // Expect a single output candidate.
@@ -562,19 +594,22 @@ TEST_F(PipelineCustomSamplingTest, ScoreCustomSamplingSingleBatch) {
 }
 
 TEST_F(PipelineCustomSamplingTest, ScoreCustomSamplingMultiBatch) {
-  const std::vector<std::vector<int>> decode_tokens = {
-      {224, 90}, {24, 547},    {8, 58},   {66, 735}, {246, 210},
-      {18, 466}, {2295, 2294}, {2294, 0}, {0, 0}};
-  auto executor = std::make_unique<FakeLlmExecutor>(
-      /*vocab_size=*/2560,
-      /*prefill_tokens=*/std::vector<std::vector<int>>{}, decode_tokens,
-      /*batch_size=*/2);
   auto decoded_ids = CreateTensorBuffer<int>(/*dimensions=*/{2, 1});
   StopTokenDetector stop_token_detector(/*batch_size=*/2);
   auto status = stop_token_detector.AddStopTokenSequence(/*stop_sequence=*/{0});
   ASSERT_OK(status);
+  auto executor = CreateFakeLlmExecutor(
+      /*prefill_tokens=*/{}, /*decode_tokens=*/{{224, 90},
+                                                {24, 547},
+                                                {8, 58},
+                                                {66, 735},
+                                                {246, 210},
+                                                {18, 466},
+                                                {2295, 2294},
+                                                {2294, 0},
+                                                {0, 0}});
   auto responses = ScoreCustomSampling(
-      *executor, *tokenizer_,
+      executor, *tokenizer_,
       std::vector<absl::string_view>{"How's it going?", "Hello World!"}, 1.0f,
       *decoded_ids);
   ASSERT_OK(responses);
@@ -589,8 +624,19 @@ TEST_F(PipelineCustomSamplingTest, ScoreCustomSamplingMultiBatch) {
 }
 
 TEST_F(PipelineCustomSamplingTest, DecodeCustomSamplingReachMaxNumTokens) {
+  auto executor = CreateFakeLlmExecutor(
+      /*prefill_tokens=*/{{8, 58}},
+      /*decode_tokens=*/{{224, 90},
+                         {24, 547},
+                         {8, 58},  // Stop here because of max num tokens.
+                         {66, 735},
+                         {246, 210},
+                         {18, 466},
+                         {2295, 2294},
+                         {2294, 0},
+                         {0, 0}});
   // Set the max number of tokens to 3.
-  executor_->GetMutableExecutorSettings().value()->SetMaxNumTokens(3);
+  executor.GetMutableExecutorSettings().value()->SetMaxNumTokens(3);
   auto sampler_or = TopPSampler::Create(/*k=*/1, /*p=*/0.5, /*temperature=*/1.0,
                                         /*batch_size=*/2, /*seed=*/1);
   EXPECT_TRUE(sampler_or.ok());
@@ -601,7 +647,7 @@ TEST_F(PipelineCustomSamplingTest, DecodeCustomSamplingReachMaxNumTokens) {
   StopTokenDetector stop_token_detector(2);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
   auto responses =
-      DecodeCustomSampling(*executor_, *tokenizer_, stop_token_detector,
+      DecodeCustomSampling(executor, *tokenizer_, stop_token_detector,
                            /*num_output_candidates=*/2, *sampler, *decoded_ids,
                            /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
@@ -628,8 +674,28 @@ TEST_F(PipelineCustomSamplingTest, DecodeCustomSamplingStreaming) {
   std::vector<std::string> responses(2);
   absl::Status status;
   bool done = false;
+  auto executor = CreateFakeLlmExecutor(
+      // The expected prefill tokens that after stop tokens are found in
+      // decoding with CustomSampling. That is, the last sampled tokens at stop
+      // condition.
+      /*prefill_tokens=*/{{2294, 0}},
+      // " How's it going?!" and " Hello World!" followed by the stop token id
+      // (0)
+      /*decode_tokens=*/
+      {{224, 90},
+       {24, 547},
+       {8, 58},
+       {66, 735},
+       {246, 210},
+       {18, 466},
+       {2295, 2294},
+       {2294, 0},  // should stop decoding here
+       {0, 0}},
+      /*vocab_size=*/2560,
+      /*batch_size=*/2);
+
   EXPECT_OK(DecodeCustomSamplingStreaming(
-      *executor_, *tokenizer_, stop_token_detector,
+      executor, *tokenizer_, stop_token_detector,
       /*num_output_candidates=*/2, *sampler, *decoded_ids,
       /*constraint=*/nullptr, benchmark_info,
       std::make_unique<TestCallbacks>(responses, status, done)));
@@ -642,8 +708,19 @@ TEST_F(PipelineCustomSamplingTest, DecodeCustomSamplingStreaming) {
 
 TEST_F(PipelineCustomSamplingTest,
        DecodeCustomSamplingStreamingReachMaxNumTokens) {
+  auto executor = CreateFakeLlmExecutor(
+      /*prefill_tokens=*/{{8, 58}},
+      /*decode_tokens=*/{{224, 90},
+                         {24, 547},
+                         {8, 58},  // Stop here because of max num tokens.
+                         {66, 735},
+                         {246, 210},
+                         {18, 466},
+                         {2295, 2294},
+                         {2294, 0},
+                         {0, 0}});
   // Set the max number of tokens to 3.
-  executor_->GetMutableExecutorSettings().value()->SetMaxNumTokens(3);
+  executor.GetMutableExecutorSettings().value()->SetMaxNumTokens(3);
   auto sampler_or = TopPSampler::Create(/*k=*/1, /*p=*/0.5, /*temperature=*/1.0,
                                         /*batch_size=*/2, /*seed=*/1);
   EXPECT_TRUE(sampler_or.ok());
@@ -660,7 +737,7 @@ TEST_F(PipelineCustomSamplingTest,
   std::vector<std::string> responses(2);
   bool done = false;
   EXPECT_OK(DecodeCustomSamplingStreaming(
-      *executor_, *tokenizer_, stop_token_detector,
+      executor, *tokenizer_, stop_token_detector,
       /*num_output_candidates=*/2, *sampler, *decoded_ids,
       /*constraint=*/nullptr, benchmark_info,
       std::make_unique<TestCallbacks>(responses, status, done)));
@@ -693,8 +770,20 @@ TEST_F(PipelineCustomSamplingTest, DecodeComplexStopTokenDetector) {
   // previous stop token sequence.
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({90, 548}));
 
+  auto executor = CreateFakeLlmExecutor(
+      /*prefill_tokens=*/{{0, 0}},
+      /*decode_tokens=*/{{224, 90},
+                         {24, 547},
+                         {8, 58},
+                         {66, 735},
+                         {246, 210},
+                         {18, 466},
+                         {2295, 2294},
+                         {2294, 0},
+                         {0, 0}});
+
   auto responses =
-      DecodeCustomSampling(*executor_, *tokenizer_, stop_token_detector,
+      DecodeCustomSampling(executor, *tokenizer_, stop_token_detector,
                            /*num_output_candidates=*/2, *sampler, *decoded_ids,
                            /*constraint=*/nullptr, benchmark_info);
   EXPECT_OK(responses);
@@ -719,11 +808,20 @@ TEST_F(PipelineCustomSamplingTest,
   for (int i = 0; i < 100; ++i) {
     decode_tokens.push_back({1, 1});
   }
-  auto delayed_executor = std::make_unique<FakeLlmExecutor>(
-      /*vocab_size=*/2560, std::vector<std::vector<int>>{{2}}, decode_tokens,
-      /*batch_size=*/2);
+  auto delayed_executor = CreateFakeLlmExecutor(
+      /*prefill_tokens=*/{{0, 0}},
+      /*decode_tokens=*/{{224, 90},
+                         {24, 547},
+                         {8, 58},
+                         {66, 735},
+                         {246, 210},
+                         {18, 466},
+                         {2295, 2294},
+                         {2294, 0},
+                         {0, 0}});
+
   // Set the delay long enough not to be flaky.
-  delayed_executor->SetDecodeDelay(absl::Milliseconds(1000));
+  delayed_executor.SetDecodeDelay(absl::Milliseconds(1000));
 
   auto sampler_or = TopPSampler::Create(/*k=*/1, /*p=*/0.5, /*temperature=*/1.0,
                                         /*batch_size=*/2, /*seed=*/1);
@@ -746,7 +844,7 @@ TEST_F(PipelineCustomSamplingTest,
   bool done = false;
   ASSERT_OK(pool.Schedule([&]() {
     status = DecodeCustomSamplingStreaming(
-        *delayed_executor, *tokenizer_, stop_token_detector,
+        delayed_executor, *tokenizer_, stop_token_detector,
         /*num_output_candidates=*/2, *sampler, *decoded_ids,
         /*constraint=*/nullptr, benchmark_info,
         std::make_unique<TestCallbacks>(responses, callbacks_status, done,
@@ -782,24 +880,27 @@ TEST_F(PipelineCustomSamplingTest,
   std::optional<BenchmarkInfo> benchmark_info;
 
   // Fake constraint that expects " Hello World".
-  std::vector<int> expected_token_ids = {2, 90, 547, 58, 735, 210, 466, 6};
+  std::vector<int> expected_token_ids = {2, 90, 547, 58, 735, 210, 466, 0};
   auto constraint = std::make_unique<FakeConstraint>(expected_token_ids,
                                                      /*vocabulary_size=*/2560);
 
-  std::vector<std::vector<int>> prefill_tokens = {{2}};
-  // The decode tokens are the expected tokens that will be returned by the
-  // Decode function. The decode tokens are the same for both batch items. The
-  // decode tokens are " Hello World!".
-  std::vector<std::vector<int>> decode_tokens = {
-      {90, 90},   {547, 547},   {58, 58}, {735, 735}, {210, 210},
-      {466, 466}, {2294, 2294}, {0, 0},   {0, 0}};
-  auto executor = std::make_unique<FakeLlmExecutor>(
-      /*vocab_size=*/2560, prefill_tokens, decode_tokens, /*batch_size=*/2);
+  auto executor = CreateFakeLlmExecutor(
+      /*prefill_tokens=*/{{0, 0}},
+      // " Hello World!" for both batch because constraint is set.
+      /*decode_tokens=*/{{90, 90},
+                         {547, 547},
+                         {58, 58},
+                         {735, 735},
+                         {210, 210},
+                         {466, 466},
+                         {2294, 2294},  // Stop here because constraint is set.
+                         {0, 0},
+                         {0, 0}});
 
   StopTokenDetector stop_token_detector(2);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
   EXPECT_OK(DecodeCustomSamplingStreaming(
-      *executor, *tokenizer_, stop_token_detector,
+      executor, *tokenizer_, stop_token_detector,
       /*num_output_candidates=*/2, *sampler, *decoded_ids,
       /*constraint=*/constraint.get(), benchmark_info,
       std::make_unique<TestCallbacks>(responses, callbacks_status, done)));
@@ -808,7 +909,8 @@ TEST_F(PipelineCustomSamplingTest,
 }
 
 TEST_F(PipelineCustomSamplingTest, DecodeStopTokenAndBPEDetector) {
-  auto sampler_or = TopPSampler::Create(/*k=*/1, /*p=*/0.5, /*temperature=*/1.0,
+  auto sampler_or = TopPSampler::Create(/*k=*/1, /*p=*/0.5,
+                                        /*temperature=*/1.0,
                                         /*batch_size=*/2, /*seed=*/1);
   EXPECT_TRUE(sampler_or.ok());
   std::unique_ptr<TopPSampler> sampler = std::move(sampler_or.value());
@@ -847,9 +949,22 @@ TEST_F(PipelineCustomSamplingTest, DecodeStopTokenAndBPEDetector) {
   // This will stop the decoding.
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({547, 58}));
 
+  auto executor = CreateFakeLlmExecutor(
+      // The expected prefill tokens that after stop tokens are found in
+      // decoding with CustomSampling. That is, the last sampled tokens at
+      // stop condition.
+      /*prefill_tokens=*/{{66, 735}},
+      /*decode_tokens=*/
+      {{224, 90},
+       {24, 547},
+       {8, 58},
+       {66, 735},  // Stop here because of BPE.
+       {2294, 2294},
+       {0, 0}});
+
   auto decoded_ids = CreateTensorBuffer<int>({2, 1});
   auto responses =
-      DecodeCustomSampling(*executor_, *tokenizer, stop_token_detector,
+      DecodeCustomSampling(executor, *tokenizer, stop_token_detector,
                            /*num_output_candidates=*/2, *sampler, *decoded_ids,
                            /*constraint=*/nullptr, benchmark_info);
 
@@ -906,8 +1021,8 @@ TEST_F(PipelineCallbacksTest,
       {2, 90, 547, 58, 735, 210, 466, 2294}};
   // "How's it going?", "Hello World", "How's it going?"
   std::vector<std::vector<int>> decode_tokens = {
-        {224, 90, 224},  {24, 547, 24}, {8, 58, 8},         {66, 735, 66},
-        {246, 210, 246}, {18, 466, 18}, {2295, 2294, 2295}, {2294, 0, 2294}};
+      {224, 90, 224},  {24, 547, 24}, {8, 58, 8},         {66, 735, 66},
+      {246, 210, 246}, {18, 466, 18}, {2295, 2294, 2295}, {2294, 0, 2294}};
   executor_ = std::make_unique<FakeLlmExecutor>(
       /*vocab_size=*/2560, prefill_tokens, decode_tokens, kNumOutputCandidates);
 

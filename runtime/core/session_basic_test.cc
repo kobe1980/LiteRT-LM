@@ -370,8 +370,12 @@ TEST_F(SessionBasicTest, RunDecodeWithSamplerAndConstrainedDecoding) {
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
-          /*prefill_tokens=*/{{2, 224}},
-          // "How's it going?"
+          /*prefill_tokens=*/{{2, 224},  // The first prefill.
+                              {0}},  // The expected prefill tokens that after
+                                     // stop tokens are found in decoding with
+                                     // sampler. That is, the last
+                                     // sampled tokens at stop condition.
+                                     // "How's it going?"
           /*decode_tokens=*/{
               {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
   auto session = SessionBasic::Create(
@@ -517,8 +521,12 @@ TEST_F(SessionBasicTest, RunDecodeAsyncWithSamplerAndConstrainedDecoding) {
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
-          /*prefill_tokens=*/{{2, 224}},
-          // "How's it going?"
+          /*prefill_tokens=*/{{2, 224},  // The first prefill.
+                              {0}},  // The expected prefill tokens that after
+                                     // stop tokens are found in decoding with
+                                     // sampler. That is, the last
+                                     // sampled tokens at stop condition.
+                                     // "How's it going?"
           /*decode_tokens=*/{
               {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
   auto session = SessionBasic::Create(
@@ -1948,8 +1956,12 @@ TEST_F(SessionBasicTest,
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
-          /*prefill_tokens=*/{{2, 224}},
-          // "How's it going?"
+          /*prefill_tokens=*/{{2, 224},  // The first prefill.
+                              {0}},  // The expected prefill tokens that after
+                                     // stop tokens are found in decoding with
+                                     // sampler. That is, the last
+                                     // sampled tokens at stop condition.
+                                     // "How's it going?"
           /*decode_tokens=*/{
               {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
   auto session = SessionBasic::Create(
