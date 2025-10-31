@@ -96,13 +96,14 @@ absl::StatusOr<Environment&> GetEnvironment(
           std::filesystem::path path(model_path);
           // Note: Existence check for path was here, but it's better to check
           // before calling this function if needed.
-          std::string dispatch_library_path = path.parent_path().string();
-          if (!dispatch_library_path.empty()) {
+          static const absl::NoDestructor<std::string> kDispatchLibraryPath(
+              path.parent_path().string());
+          if (!kDispatchLibraryPath->empty()) {
             ABSL_LOG(INFO) << "Setting dispatch library path: "
-                           << dispatch_library_path;
+                           << *kDispatchLibraryPath;
             env_options.push_back(::litert::Environment::Option{
                 ::litert::Environment::OptionTag::DispatchLibraryDir,
-                absl::string_view(dispatch_library_path)});
+                absl::string_view(*kDispatchLibraryPath)});
           } else {
             ABSL_LOG(INFO) << "No dispatch library path provided.";
           }
