@@ -13,9 +13,21 @@
 # limitations under the License.
 
 load("@rules_kotlin//kotlin:android.bzl", "kt_android_library")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+
+kt_jvm_library(
+    name = "litertlm-jvm",
+    srcs = glob(["*.kt"]),
+    deps = [
+        "@rules_kotlin//kotlin/compiler:kotlin-reflect",
+        "@maven//:com_google_code_gson_gson",
+        "@maven//:com_google_flogger_flogger",
+        "@maven//:com_google_flogger_flogger_system_backend",
+    ],
+)
 
 kt_android_library(
-    name = "litertlm",
+    name = "litertlm-android",
     srcs = glob(["*.kt"]),
     deps = [
         "@rules_kotlin//kotlin/compiler:kotlin-reflect",

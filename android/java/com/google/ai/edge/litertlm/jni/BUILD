@@ -31,7 +31,11 @@ DEPS = [
 cc_binary(
     name = "jni",
     srcs = ["litertlm.cc"],
-    deps = DEPS,
     linkshared = 1,
-    tags = ["manual"], # avoid building without android flags in CI
+    tags = ["manual"],  # avoid building without android flags in CI
+    visibility = ["//android/java/com/google/ai/edge/litertlm:__pkg__"],
+    deps = DEPS + select({
+        "@platforms//os:android": [],
+        "//conditions:default": ["@rules_java//toolchains:jni"],
+    }),
 )
