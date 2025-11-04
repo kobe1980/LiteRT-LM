@@ -112,7 +112,7 @@ absl::StatusOr<LlmExecutorSettings> LlmExecutorSettings::CreateDefault(
     return absl::InvalidArgumentError(
         absl::StrCat("Unsupported backend: ", backend));
   }
-  settings.SetBackend(backend);
+  RETURN_IF_ERROR(settings.SetBackend(backend));
   // Explicitly set the field value to avoid undefined behavior. Setting to 0
   // means that the maximum number of tokens is not set can could be inferred
   // from the model assets (but note that for the model or backend which does

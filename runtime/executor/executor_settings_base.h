@@ -22,6 +22,7 @@
 #include <utility>
 #include <variant>
 
+#include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "runtime/util/scoped_file.h"
@@ -147,12 +148,17 @@ std::ostream& operator<<(std::ostream& os, const ModelAssets& model_assets);
 // Base Settings for the executor modules.
 class ExecutorSettingsBase {
  public:
+  virtual ~ExecutorSettingsBase() = default;
+
   // Getter APIs.
   const ModelAssets& GetModelAssets() const { return model_assets_; }
 
   // Backend APIs.
   const Backend& GetBackend() const { return backend_; }
-  void SetBackend(const Backend& backend) { backend_ = backend; }
+  virtual absl::Status SetBackend(const Backend& backend) {
+    backend_ = backend;
+    return absl::OkStatus();
+  }
 
   // Activation data type APIs.
   const std::optional<ActivationDataType>& GetActivationDataType() const {
@@ -186,6 +192,8 @@ class ExecutorSettingsBase {
  protected:
   explicit ExecutorSettingsBase(ModelAssets model_assets)
       : model_assets_(std::move(model_assets)) {}
+  // Optional setting to use LLM executor backend.
+  Backend backend_ = Backend::CPU;
 
  private:
   // Path to the LiteRT model file.
@@ -202,9 +210,6 @@ class ExecutorSettingsBase {
   // Open file for writing the weight cache to and later loading cache from.
   // If set, this should be preferred over the `cache_dir_`.
   std::shared_ptr<litert::lm::ScopedFile> scoped_cache_file_;
-
-  // Optional setting to use LLM executor backend.
-  Backend backend_ = Backend::CPU;
 
   // Optional setting for specific activation data type. If not set, the
   // default activation data type for each OS & backend will be used. Setting

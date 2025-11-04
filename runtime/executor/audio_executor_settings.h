@@ -34,15 +34,12 @@ class AudioExecutorSettings : public ExecutorSettingsBase {
   // Setter for max_sequence_length.
   void SetMaxSequenceLength(int max_sequence_length);
 
-  // Getter for backend.
-  Backend GetBackend() const;
-  // Setter for backend.
-  absl::Status SetBackend(Backend backend);
-
   // Getter for bundled_with_main_model.
   bool GetBundledWithMainModel() const;
   // Setter for bundled_with_main_model.
   void SetBundledWithMainModel(bool bundled_with_main_model);
+
+  absl::Status SetBackend(const Backend& backend) override;
 
  private:
   explicit AudioExecutorSettings(const ModelAssets& model_assets,
@@ -51,8 +48,6 @@ class AudioExecutorSettings : public ExecutorSettingsBase {
         max_sequence_length_(max_sequence_length) {}
 
   int max_sequence_length_;
-
-  Backend backend_;
 
   bool bundled_with_main_model_;
 };

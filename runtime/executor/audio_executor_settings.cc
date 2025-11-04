@@ -51,9 +51,7 @@ void AudioExecutorSettings::SetMaxSequenceLength(int max_sequence_length) {
   max_sequence_length_ = max_sequence_length;
 }
 
-Backend AudioExecutorSettings::GetBackend() const { return backend_; }
-
-absl::Status AudioExecutorSettings::SetBackend(Backend backend) {
+absl::Status AudioExecutorSettings::SetBackend(const Backend& backend) {
   if (backend != Backend::CPU && backend != Backend::GPU &&
       backend != Backend::GPU_ARTISAN) {
     return absl::InvalidArgumentError(

@@ -114,7 +114,8 @@ TEST(EngineSettingsTest, MainExecutorSettingsSetAndGetExecutorBackend) {
 
   auto settings = EngineSettings::CreateDefault(*model_assets, Backend::GPU);
   EXPECT_OK(settings);
-  settings->GetMutableMainExecutorSettings().SetBackend(Backend::GPU);
+  EXPECT_OK(
+      settings->GetMutableMainExecutorSettings().SetBackend(Backend::GPU));
   EXPECT_THAT(settings->GetMainExecutorSettings().GetBackend(),
               Eq(Backend::GPU));
 }
@@ -145,7 +146,8 @@ TEST(EngineSettingsTest, VisionExecutorSettingsSetAndGetBackend) {
   ASSERT_TRUE(settings->GetVisionExecutorSettings().has_value());
   EXPECT_EQ(settings->GetVisionExecutorSettings()->GetBackend(), Backend::GPU);
 
-  settings->GetMutableVisionExecutorSettings()->SetBackend(Backend::NPU);
+  EXPECT_OK(
+      settings->GetMutableVisionExecutorSettings()->SetBackend(Backend::NPU));
   EXPECT_EQ(settings->GetVisionExecutorSettings()->GetBackend(), Backend::NPU);
 }
 
@@ -709,7 +711,8 @@ TEST(SessionConfigTest, MaybeUpdateAndValidatePickGpuAsSamplerBackend) {
   auto model_assets = ModelAssets::Create("test_model_path_1");
   ASSERT_OK(model_assets);
   auto settings = EngineSettings::CreateDefault(*model_assets);
-  settings->GetMutableMainExecutorSettings().SetBackend(Backend::GPU);
+  EXPECT_OK(
+      settings->GetMutableMainExecutorSettings().SetBackend(Backend::GPU));
   auto session_config = SessionConfig::CreateDefault();
   EXPECT_OK(settings);
   // We didn't call MaybeUpdateAndValidate on EngineSettings, so some of the

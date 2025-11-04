@@ -64,20 +64,16 @@ std::ostream& operator<<(std::ostream& os, const std::vector<int>& vec) {
   return os;
 }
 
-// TODO(b/455715016): Simplify this function by setting up the proper
-// inheritance of the executor settings. The Backend Getter should be part of
-// the base class.
-template <typename T>
 absl::Status ValidateBackendConstraint(
-    const std::optional<T>& executor_settings,
+    ExecutorSettingsBase& executor_settings,  // Polymorphic executor settings.
     const std::optional<std::string>& backend_constraint,
     absl::string_view modality_name) {
-  if (executor_settings.has_value() && backend_constraint.has_value()) {
+  if (backend_constraint.has_value()) {
     // When both the executor settings and the backend constraint are set, we
     // check if the backend constraint contains the backend of the executor
     // settings.
     std::string backend_constraint_str = backend_constraint.value();
-    std::string backend = GetBackendString(executor_settings->GetBackend());
+    std::string backend = GetBackendString(executor_settings.GetBackend());
     std::vector<std::string> constraints =
         absl::StrSplit(backend_constraint_str, ',');
     bool found =
@@ -94,12 +90,9 @@ absl::Status ValidateBackendConstraint(
     }
     ABSL_LOG(INFO) << "The " << modality_name
                    << " backend constraint is matched: " << backend;
-  } else if (executor_settings.has_value()) {
-    ABSL_LOG(INFO) << "The " << modality_name
-                   << " backend constraint is not set.";
   } else {
     ABSL_LOG(INFO) << "The " << modality_name
-                   << " executor_settings is not set.";
+                   << " backend constraint is not set.";
   }
   return absl::OkStatus();
 }
@@ -242,12 +235,18 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
 
   // If the executor settings is set, then check if the input backend constraint
   // is compatible with the executor settings.
-  RETURN_IF_ERROR(ValidateBackendConstraint<LlmExecutorSettings>(
-      main_executor_settings_, text_backend_constraint, "Main"));
-  RETURN_IF_ERROR(ValidateBackendConstraint<LlmExecutorSettings>(
-      vision_executor_settings_, vision_backend_constraint, "Vision"));
-  RETURN_IF_ERROR(ValidateBackendConstraint<AudioExecutorSettings>(
-      audio_executor_settings_, audio_backend_constraint, "Audio"));
+  RETURN_IF_ERROR(ValidateBackendConstraint(main_executor_settings_,
+                                            text_backend_constraint, "Main"));
+
+  if (vision_executor_settings_.has_value()) {
+    RETURN_IF_ERROR(ValidateBackendConstraint(vision_executor_settings_.value(),
+                                              vision_backend_constraint,
+                                              "Vision"));
+  }
+  if (audio_executor_settings_.has_value()) {
+    RETURN_IF_ERROR(ValidateBackendConstraint(
+        audio_executor_settings_.value(), audio_backend_constraint, "Audio"));
+  }
 
   ABSL_LOG(INFO) << "The llm metadata: " << metadata.DebugString();
   ABSL_LOG(INFO) << "The validated engine settings: " << *this;
