@@ -271,8 +271,6 @@ TEST_F(SessionAdvancedTest, RunDecodeWithInternalSampler) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
@@ -310,7 +308,7 @@ TEST_F(SessionAdvancedTest, RunDecodeWithExternalSampler) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
@@ -351,8 +349,6 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
   session_config.SetNumOutputCandidates(3);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
@@ -399,7 +395,7 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
   session_config.SetNumOutputCandidates(3);
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
@@ -458,8 +454,6 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableSamplerParams() = sampler_params;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
@@ -512,7 +506,7 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableSamplerParams() = sampler_params;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
@@ -599,8 +593,6 @@ TEST_F(SessionAdvancedTest, RunDecodeAsyncWithInternalSampler) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.SetStartTokenId(2);
   session_config.GetMutableStopTokenIds() = stop_token_ids;
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
@@ -638,7 +630,7 @@ TEST_F(SessionAdvancedTest, RunDecodeAsyncWithExternalSampler) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.SetStartTokenId(2);
   session_config.GetMutableStopTokenIds() = stop_token_ids;
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
@@ -690,8 +682,6 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableSamplerParams() = sampler_params;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
@@ -755,7 +745,7 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableSamplerParams() = sampler_params;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
@@ -807,8 +797,6 @@ TEST_F(SessionAdvancedTest, RunPrefillAndDecodeAsyncWithInternalSampler) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
@@ -1042,8 +1030,6 @@ TEST_F(SessionAdvancedTest, RunDecodeAsyncWithCancellationWithInternalSampler) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto execution_manager,
       ExecutionManager::Create(tokenizer_.get(), std::move(fake_executor),
@@ -1097,7 +1083,7 @@ TEST_F(SessionAdvancedTest, RunDecodeAsyncWithCancellationWithExternalSampler) {
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
   ASSERT_OK_AND_ASSIGN(
       auto execution_manager,
@@ -1176,8 +1162,6 @@ TEST_P(SessionAdvancedCancellationTest,
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
 
   std::optional<BenchmarkInfo> benchmark_info;
   if (use_benchmark_info_) {
@@ -1252,7 +1236,7 @@ TEST_P(SessionAdvancedCancellationTest,
   session_config.GetMutableSamplerParams() = sampler_params_;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
 
   std::optional<BenchmarkInfo> benchmark_info;
@@ -1466,8 +1450,6 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableSamplerParams() = sampler_params;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // GPU backend will use internal sampler.
-  session_config.SetSamplerBackend(Backend::GPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
@@ -1531,7 +1513,7 @@ TEST_F(SessionAdvancedTest,
   session_config.GetMutableSamplerParams() = sampler_params;
   session_config.GetMutableStopTokenIds() = stop_token_ids;
   session_config.SetStartTokenId(2);
-  // CPU backend will use external sampler.
+  session_config.SetUseExternalSampler(true);
   session_config.SetSamplerBackend(Backend::CPU);
   ASSERT_OK_AND_ASSIGN(
       auto executor,

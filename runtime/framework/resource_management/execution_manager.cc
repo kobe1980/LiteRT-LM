@@ -65,7 +65,11 @@ absl::StatusOr<SessionId> ExecutionManager::RegisterNewSession(
   ASSIGN_OR_RETURN(auto context_handler,
                    resource_manager_->CreateContextHandler(session_config));
   std::unique_ptr<Sampler> sampler;
-  if (session_config.GetSamplerBackend() == Backend::CPU) {
+  if (session_config.UseExternalSampler()) {
+    if (session_config.GetSamplerBackend() != Backend::CPU) {
+      return absl::InvalidArgumentError(
+          "External sampler currently only supports CPU backend.");
+    }
     ASSIGN_OR_RETURN(sampler,
                      CreateSampler(session_config.GetSamplerBackend(),
                                    session_config.GetNumOutputCandidates(),

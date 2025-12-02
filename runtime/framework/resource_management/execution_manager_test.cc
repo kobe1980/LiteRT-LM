@@ -92,11 +92,8 @@ class ExecutionManagerTest : public ::testing::Test {
     EXPECT_OK(settings.MaybeUpdateAndValidate(*tokenizer_, &llm_metadata));
     SessionConfig session_config = SessionConfig::CreateDefault();
     EXPECT_OK(session_config.MaybeUpdateAndValidate(settings));
-    if (use_external_sampler) {
-      session_config.SetSamplerBackend(Backend::CPU);
-    } else {
-      session_config.SetSamplerBackend(Backend::GPU);
-    }
+    session_config.SetUseExternalSampler(use_external_sampler);
+
     return session_config;
   };
 

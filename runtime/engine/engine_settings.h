@@ -223,6 +223,12 @@ class SessionConfig {
     apply_prompt_template_in_session_ = apply_prompt_template_in_session;
   }
 
+  // Whether to use external sampler.
+  bool UseExternalSampler() const { return use_external_sampler_; }
+  void SetUseExternalSampler(bool use_external_sampler) {
+    use_external_sampler_ = use_external_sampler;
+  }
+
  private:
   // Private constructor for the SessionConfig. The user should use the
   // CreateDefault() method to create a SessionConfig.
@@ -268,6 +274,10 @@ class SessionConfig {
   // TODO - b/453312248: Remove this field once the prompt templates are
   // removed.
   bool apply_prompt_template_in_session_ = true;
+
+  // Whether to use external sampler.
+  // notice: this is only used in advanced engine.
+  bool use_external_sampler_ = false;
 };
 
 std::ostream& operator<<(std::ostream& os, const SessionConfig& config);
