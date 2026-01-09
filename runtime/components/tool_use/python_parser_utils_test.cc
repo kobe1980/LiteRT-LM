@@ -327,6 +327,17 @@ TEST(PythonParserUtilsTest, ParseListArgumentWithTrailingComma) {
               }])json")));
 }
 
+TEST(PythonParserUtilsTest, ParseDictArgumentWithTrailingComma) {
+  EXPECT_THAT(ParsePythonExpression(
+                  "function_name(x={'hello': 'world', 'foo': 'bar',})"),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
+                "name": "function_name",
+                "arguments": {
+                  "x": {"hello": "world", "foo": "bar"}
+                }
+              }])json")));
+}
+
 TEST(PythonParserUtilsTest, PositionalArgumentsAreInvalid) {
   EXPECT_THAT(ParsePythonExpression("function_name(1, 2, 3)"),
               StatusIs(absl::StatusCode::kInvalidArgument));
