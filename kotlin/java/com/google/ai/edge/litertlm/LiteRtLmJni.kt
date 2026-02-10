@@ -54,6 +54,24 @@ internal object LiteRtLmJni {
   ): Long
 
   /**
+   * Creates a new LiteRT-LM engine for benchmarking.
+   *
+   * @param modelPath The path to the model file.
+   * @param backend The backend to use for the engine.
+   * @param prefillTokens The number of tokens to prefill.
+   * @param decodeTokens The number of tokens to decode.
+   * @param cacheDir The directory for cache files.
+   * @return A pointer to the native engine instance.
+   */
+  external fun nativeCreateBenchmark(
+    modelPath: String,
+    backend: String,
+    prefillTokens: Int,
+    decodeTokens: Int,
+    cacheDir: String,
+  ): Long
+
+  /**
    * Delete the LiteRT-LM engine.
    *
    * @param enginePointer A pointer to the native engine instance.

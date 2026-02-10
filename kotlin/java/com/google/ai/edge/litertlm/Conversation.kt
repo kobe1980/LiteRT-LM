@@ -65,7 +65,8 @@ import kotlinx.coroutines.flow.callbackFlow
  * @property handle The native handle to the conversation object.
  * @property toolManager The ToolManager instance to use for this conversation.
  */
-class Conversation(private val handle: Long, val toolManager: ToolManager) : AutoCloseable {
+class Conversation(private val handle: Long, val toolManager: ToolManager = ToolManager()) :
+  AutoCloseable {
   private val _isAlive = AtomicBoolean(true)
 
   /** Whether the conversation is alive and ready to be used, */

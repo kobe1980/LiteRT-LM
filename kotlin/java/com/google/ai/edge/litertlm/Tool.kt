@@ -206,7 +206,7 @@ fun tool(openApiTool: OpenApiTool): ToolProvider {
  *
  * @property tools A list of [ToolProvider].
  */
-class ToolManager(val tools: List<Any>) {
+class ToolManager(val tools: List<Any> = emptyList()) {
 
   @OptIn(ExperimentalApi::class)
   private val useSnakeCase = ExperimentalFlags.convertCamelToSnakeCaseInToolDescription

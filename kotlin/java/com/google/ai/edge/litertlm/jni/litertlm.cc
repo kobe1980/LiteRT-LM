@@ -349,7 +349,6 @@ LITERTLM_JNIEXPORT void JNICALL JNI_METHOD(nativeSetMinLogSeverity)(
       tflite_log_severity);
 }
 
-// __declspec( dllexport )
 LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
     JNIEnv* env, jclass thiz, jstring model_path, jstring backend,
     jstring vision_backend, jstring audio_backend, jint max_num_tokens,
@@ -462,6 +461,65 @@ LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
   if (enable_benchmark) {
     settings->GetMutableBenchmarkParams();
   }
+
+  auto engine = EngineFactory::CreateAny(*settings);
+  if (!engine.ok()) {
+    ThrowLiteRtLmJniException(
+        env, "Failed to create engine: " + engine.status().ToString());
+    return 0;
+  }
+
+  return reinterpret_cast<jlong>(engine->release());
+}
+
+LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateBenchmark)(
+    JNIEnv* env, jclass thiz, jstring model_path, jstring backend,
+    jint prefill_tokens, jint decode_tokens, jstring cache_dir) {
+  const char* model_path_chars = env->GetStringUTFChars(model_path, nullptr);
+  std::string model_path_str(model_path_chars);
+  env->ReleaseStringUTFChars(model_path, model_path_chars);
+
+  // Check if the file exists.
+  struct stat buffer;
+  if (stat(model_path_str.c_str(), &buffer) != 0) {
+    ThrowLiteRtLmJniException(env, "Model file not found: " + model_path_str);
+    return 0;
+  }
+
+  auto model_assets = ModelAssets::Create(model_path_str);
+  if (!model_assets.ok()) {
+    ThrowLiteRtLmJniException(env, "Failed to create model assets: " +
+                                       model_assets.status().ToString());
+    return 0;
+  }
+
+  const char* backend_chars = env->GetStringUTFChars(backend, nullptr);
+  std::string backend_str(backend_chars);
+  env->ReleaseStringUTFChars(backend, backend_chars);
+
+  auto backend_enum = litert::lm::GetBackendFromString(backend_str);
+  if (!backend_enum.ok()) {
+    ThrowLiteRtLmJniException(env, backend_enum.status().ToString());
+    return 0;
+  }
+
+  auto settings = EngineSettings::CreateDefault(*model_assets, *backend_enum);
+  if (!settings.ok()) {
+    ThrowLiteRtLmJniException(env, "Failed to create engine settings: " +
+                                       settings.status().ToString());
+    return 0;
+  }
+
+  const char* cache_dir_chars = env->GetStringUTFChars(cache_dir, nullptr);
+  std::string cache_dir_str(cache_dir_chars);
+  env->ReleaseStringUTFChars(cache_dir, cache_dir_chars);
+  if (!cache_dir_str.empty()) {
+    settings->GetMutableMainExecutorSettings().SetCacheDir(cache_dir_str);
+  }
+
+  auto& benchmark_params = settings->GetMutableBenchmarkParams();
+  benchmark_params.set_num_prefill_tokens(prefill_tokens);
+  benchmark_params.set_num_decode_tokens(decode_tokens);
 
   auto engine = EngineFactory::CreateAny(*settings);
   if (!engine.ok()) {
