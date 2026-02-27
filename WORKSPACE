@@ -441,3 +441,12 @@ neuro_pilot()
 load("@litert//third_party/google_tensor:workspace.bzl", "google_tensor")
 
 google_tensor()
+
+http_archive(
+    name = "nanobind_json",
+    strip_prefix = "nanobind_json-e1953530697f61cbca9dc9b4f51561ea785cb09d",
+    urls = ["https://github.com/ianhbell/nanobind_json/archive/e1953530697f61cbca9dc9b4f51561ea785cb09d.zip"],
+    sha256 = "72cb4cdbf8108c7dd2dc669347669f2cc1acf4f943588f96661701f27f778912",
+    patches = ["@//:PATCH.nanobind_json"],
+    build_file = "@//:BUILD.nanobind_json",
+)
