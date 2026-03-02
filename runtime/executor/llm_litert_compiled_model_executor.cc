@@ -55,6 +55,7 @@
 #include "runtime/components/embedding_lookup/embedding_lookup_manager.h"
 #include "runtime/components/model_resources.h"
 #include "runtime/components/sampler_factory.h"
+#include "runtime/executor/common_utils.h"
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/executor/litert_compiled_model_executor_utils.h"
 #include "runtime/executor/llm_executor_io_types.h"
@@ -333,9 +334,9 @@ absl::StatusOr<TensorBuffer> ResizeKVCacheTensorBuffer(
   std::optional<size_t> element_size = GetByteWidth(tensor_type.ElementType());
   RET_CHECK(element_size.has_value());
 
-  RETURN_IF_ERROR(ExpandBuffer(tensor_buffer_ptr, dimensions,
-                               new_tensor_buffer_ptr, new_dimensions,
-                               element_size.value()));
+  RETURN_IF_ERROR(executor::utils::ExpandBuffer(
+      tensor_buffer_ptr, dimensions, new_tensor_buffer_ptr, new_dimensions,
+      element_size.value()));
 
   return new_tensor_buffer;
 }

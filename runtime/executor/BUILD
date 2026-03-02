@@ -196,10 +196,8 @@ cc_library(
     hdrs = ["llm_litert_compiled_model_cache_utils.h"],
     deps = [
         "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",
-        "@com_google_absl//absl/types:span",
         "//runtime/util:convert_tensor_buffer",
         "//runtime/util:litert_status_util",
     ] + select({
@@ -223,9 +221,7 @@ cc_test(
         ":llm_litert_compiled_model_cache_utils",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:string_view",
-        "@com_google_absl//absl/types:span",
         "@litert//litert/cc:litert_model",
         "@litert//litert/cc:litert_tensor_buffer",
         "@litert//litert/test:matchers",
@@ -240,6 +236,7 @@ cc_library(
     srcs = ["llm_litert_compiled_model_executor.cc"],
     hdrs = ["llm_litert_compiled_model_executor.h"],
     deps = [
+        ":common_utils",
         ":executor_settings_base",
         ":litert_compiled_model_executor_utils",
         ":llm_executor",
@@ -932,6 +929,9 @@ cc_test(
     ],
 )
 
+# ==================================================================================================
+# Interfaces
+# ==================================================================================================
 cc_library(
     name = "kv_cache_interface",
     hdrs = ["kv_cache_interface.h"],
@@ -952,5 +952,31 @@ cc_library(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@litert//litert/cc:litert_tensor_buffer",
+    ],
+)
+
+# ==================================================================================================
+# Common Utils shared accross all implementations
+# ==================================================================================================
+
+cc_library(
+    name = "common_utils",
+    srcs = ["common_utils.cc"],
+    hdrs = ["common_utils.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/types:span",
+        "//runtime/util:litert_status_util",
+    ],
+)
+
+cc_test(
+    name = "common_utils_test",
+    srcs = ["common_utils_test.cc"],
+    deps = [
+        ":common_utils",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "//runtime/util:test_utils",
     ],
 )
