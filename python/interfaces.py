@@ -60,18 +60,37 @@ class AbstractEngine(abc.ABC):
   @abc.abstractmethod
   def create_conversation(
       self,
+      *,
+      messages: (
+          collections.abc.Sequence[collections.abc.Mapping[str, Any]] | None
+      ) = None,
       tools: (
           collections.abc.Sequence[collections.abc.Callable[..., Any]] | None
       ) = None,
   ) -> AbstractConversation:
-    """Creates a new conversation for this engine."""
+    """Creates a new conversation for this engine.
+
+    Args:
+        messages: A sequence of messages for the conversation preface. Each
+          message is a mapping that should contain 'role' and 'content' keys.
+        tools: A list of Python functions to be used as tools.
+    """
 
 
 class AbstractConversation(abc.ABC):
-  """Abstract base class for managing LiteRT-LM conversations."""
+  """Abstract base class for managing LiteRT-LM conversations.
+
+  Attributes:
+      messages: A sequence of messages for the conversation preface.
+      tools: A list of Python functions to be used as tools.
+  """
 
   def __init__(
       self,
+      *,
+      messages: (
+          collections.abc.Sequence[collections.abc.Mapping[str, Any]] | None
+      ) = None,
       tools: (
           collections.abc.Sequence[collections.abc.Callable[..., Any]] | None
       ) = None,
@@ -79,8 +98,11 @@ class AbstractConversation(abc.ABC):
     """Initializes the instance.
 
     Args:
+        messages: A sequence of messages for the conversation preface. Each
+          message is a mapping that should contain 'role' and 'content' keys.
         tools: A list of Python functions to be used as tools.
     """
+    self.messages = messages or []
     self.tools = tools or []
 
   def __enter__(self) -> AbstractConversation:
@@ -92,7 +114,9 @@ class AbstractConversation(abc.ABC):
     del exc_type, exc_val, exc_tb
 
   @abc.abstractmethod
-  def send_message(self, message: str | dict[str, Any]) -> dict[str, Any]:
+  def send_message(
+      self, message: str | collections.abc.Mapping[str, Any]
+  ) -> collections.abc.Mapping[str, Any]:
     """Sends a message and returns the response.
 
     Args:
@@ -106,8 +130,8 @@ class AbstractConversation(abc.ABC):
 
   @abc.abstractmethod
   def send_message_async(
-      self, message: str | dict[str, Any]
-  ) -> collections.abc.Iterator[dict[str, Any]]:
+      self, message: str | collections.abc.Mapping[str, Any]
+  ) -> collections.abc.Iterator[collections.abc.Mapping[str, Any]]:
     """Sends a message and streams the response.
 
     Args:

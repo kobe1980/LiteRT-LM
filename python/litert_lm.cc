@@ -417,11 +417,20 @@ NB_MODULE(litert_lm_ext, module) {
           nb::arg("traceback").none())
       .def(
           "create_conversation",
-          [](const nb::object& self, const nb::handle& tools) {
+          [](const nb::object& self, const nb::handle& messages,
+             const nb::handle& tools) {
             Engine& engine = nb::cast<Engine&>(self);
 
             auto builder = ConversationConfig::Builder();
             nb::dict py_tool_map;
+
+            bool has_preface = false;
+            JsonPreface json_preface;
+
+            if (!messages.is_none()) {
+              json_preface.messages = nb::cast<nlohmann::json>(messages);
+              has_preface = true;
+            }
 
             if (!tools.is_none()) {
               static const nb::object tool_from_function =
@@ -438,10 +447,13 @@ NB_MODULE(litert_lm_ext, module) {
                 json_tools.push_back(nb::cast<nlohmann::json>(description));
               }
 
-              JsonPreface json_preface;
               json_preface.tools = std::move(json_tools);
-              builder.SetPreface(json_preface);
+              has_preface = true;
               builder.SetEnableConstrainedDecoding(true);
+            }
+
+            if (has_preface) {
+              builder.SetPreface(json_preface);
             }
 
             auto config = VALUE_OR_THROW(builder.Build(engine));
@@ -451,6 +463,11 @@ NB_MODULE(litert_lm_ext, module) {
 
             nb::object py_conversation = nb::cast(std::move(conversation));
             py_conversation.attr("_tool_map") = py_tool_map;
+            if (messages.is_none()) {
+              py_conversation.attr("messages") = nb::list();
+            } else {
+              py_conversation.attr("messages") = messages;
+            }
             if (tools.is_none()) {
               py_conversation.attr("tools") = nb::list();
             } else {
@@ -458,6 +475,7 @@ NB_MODULE(litert_lm_ext, module) {
             }
             return py_conversation;
           },
+          nb::kw_only(), nb::arg("messages") = nb::none(),
           nb::arg("tools") = nb::none());
 
   nb::class_<Conversation>(module, "Conversation", nb::dynamic_attr())
