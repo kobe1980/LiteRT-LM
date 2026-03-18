@@ -44,6 +44,8 @@
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "runtime/engine/litert_lm_lib.h"
 #include "runtime/engine/shared_flags.h"
+#include "runtime/proto/litert_lm_metrics.pb.h"
+#include "runtime/util/metrics_util.h"
 #include "runtime/util/status_macros.h"
 
 ABSL_FLAG(std::string, backend, "cpu",
@@ -55,6 +57,9 @@ ABSL_FLAG(
 ABSL_FLAG(std::string, input_prompt, "",
           "Input prompt to use for testing LLM execution.");
 ABSL_FLAG(std::string, input_prompt_file, "", "File path to the input prompt.");
+ABSL_FLAG(std::string, metric_proto_file_path, "",
+          "Path to the file where the benchmark metrics will be saved in "
+          "protobuf format. Only collected when --benchmark is true.");
 ABSL_FLAG(int, prefill_chunk_size, -1,
           "Prefill chunk size for LLM execution. A positive value enables "
           "breaking the input prefill sequence into smaller chunks for "
@@ -108,6 +113,29 @@ std::string GetInputPrompt() {
   }
   // If no input prompt is provided, use the default prompt.
   return "What is the tallest building in the world?";
+}
+
+// Writes the metrics to the given file path in protobuf format. Only used in
+// benchmark mode when the metric file path is specified.
+absl::Status WriteMetricsToFile(
+    const std::vector<litert::lm::LitertLmMetrics>& metrics,
+    const std::string& file_path) {
+  if (metrics.empty()) {
+    return absl::InvalidArgumentError("No metrics to write.");
+  }
+
+  ASSIGN_OR_RETURN(auto proto_list, litert::lm::ToProtoList(metrics));
+
+  std::ofstream out(file_path, std::ios::out | std::ios::binary);
+  if (!out) {
+    return absl::InternalError(
+        absl::StrCat("Failed to open metric file: ", file_path));
+  }
+  if (!proto_list.SerializeToOstream(&out)) {
+    return absl::InternalError("Failed to serialize metrics to file.");
+  }
+  ABSL_LOG(INFO) << "Metrics written to: " << file_path;
+  return absl::OkStatus();
 }
 
 absl::Status MainHelper(int argc, char** argv) {
@@ -237,7 +265,20 @@ absl::Status MainHelper(int argc, char** argv) {
     }
   }
 
-  return litert::lm::RunLiteRtLm(settings);
+  std::vector<litert::lm::LitertLmMetrics> metrics;
+  const std::string metric_proto_file_path =
+      absl::GetFlag(FLAGS_metric_proto_file_path);
+  const bool collect_metrics =
+      (settings.benchmark && !metric_proto_file_path.empty());
+
+  RETURN_IF_ERROR(
+      litert::lm::RunLiteRtLm(settings, collect_metrics ? &metrics : nullptr));
+
+  if (collect_metrics) {
+    RETURN_IF_ERROR(WriteMetricsToFile(metrics, metric_proto_file_path));
+  }
+
+  return absl::OkStatus();
 }
 
 }  // namespace
