@@ -184,6 +184,7 @@ class LiteRTLMCLI:
       decode_tokens: int = 256,
       android: bool = False,
       backend: str = "cpu",
+      verbose: bool = False,
   ):
     """Benchmarks a LiteRT-LM model.
 
@@ -194,7 +195,11 @@ class LiteRTLMCLI:
       decode_tokens: The number of tokens to decode.
       android: Whether to run the benchmark on an Android device via ADB.
       backend: The backend to use (cpu or gpu).
+      verbose: Whether to enable verbose logging.
     """
+    if verbose:
+      litert_lm.set_min_log_severity(litert_lm.LogSeverity.VERBOSE)
+
     model_obj = model.Model.from_model_reference(model_reference)
     model_obj.benchmark(
         prefill_tokens=prefill_tokens,
@@ -210,6 +215,7 @@ class LiteRTLMCLI:
       android=False,
       backend="cpu",
       preset=None,
+      verbose=False,
   ):
     r'''Runs a LiteRT-LM model interactively or with a single prompt.
 
@@ -232,7 +238,10 @@ class LiteRTLMCLI:
       backend: The backend to use (cpu or gpu).
       preset: Path to a Python file containing tool functions and system
         instructions.
+      verbose: Whether to enable verbose logging.
     '''
+    if verbose:
+      litert_lm.set_min_log_severity(litert_lm.LogSeverity.VERBOSE)
 
     model_obj = model.Model.from_model_reference(model_reference)
     model_obj.run_interactive(
