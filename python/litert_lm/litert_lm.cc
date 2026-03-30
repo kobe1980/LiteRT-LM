@@ -50,6 +50,7 @@
 #include "runtime/engine/engine_settings.h"
 #include "runtime/engine/io_types.h"
 #include "runtime/executor/executor_settings_base.h"
+#include "runtime/executor/llm_executor_settings.h"
 #include "tflite/logger.h"  // from @litert
 #include "tflite/minimal_logging.h"  // from @litert
 
@@ -271,12 +272,14 @@ struct PyBenchmarkInfo {
 class Benchmark {
  public:
   Benchmark(std::string model_path, Backend backend, int prefill_tokens,
-            int decode_tokens, std::string cache_dir)
+            int decode_tokens, std::string cache_dir,
+            std::optional<bool> enable_speculative_decoding)
       : model_path_(std::move(model_path)),
         backend_(backend),
         prefill_tokens_(prefill_tokens),
         decode_tokens_(decode_tokens),
-        cache_dir_(std::move(cache_dir)) {}
+        cache_dir_(std::move(cache_dir)),
+        enable_speculative_decoding_(enable_speculative_decoding) {}
 
   PyBenchmarkInfo Run() {
     auto model_assets = VALUE_OR_THROW(ModelAssets::Create(model_path_));
@@ -285,6 +288,20 @@ class Benchmark {
 
     if (!cache_dir_.empty()) {
       settings.GetMutableMainExecutorSettings().SetCacheDir(cache_dir_);
+    }
+
+    if (enable_speculative_decoding_.has_value()) {
+      AdvancedSettings advanced_settings;
+      if (settings.GetMutableMainExecutorSettings()
+              .GetAdvancedSettings()
+              .has_value()) {
+        advanced_settings =
+            *settings.GetMutableMainExecutorSettings().GetAdvancedSettings();
+      }
+      advanced_settings.enable_speculative_decoding =
+          *enable_speculative_decoding_;
+      settings.GetMutableMainExecutorSettings().SetAdvancedSettings(
+          advanced_settings);
     }
 
     auto& benchmark_params = settings.GetMutableBenchmarkParams();
@@ -361,6 +378,8 @@ class Benchmark {
   int decode_tokens_;
   // Directory for caching compiled model artifacts.
   std::string cache_dir_;
+  // Speculative decoding mode.
+  std::optional<bool> enable_speculative_decoding_;
 };
 
 NB_MODULE(litert_lm_ext, module) {
@@ -379,7 +398,8 @@ NB_MODULE(litert_lm_ext, module) {
       [](std::string_view model_path, const nb::handle& backend,
          int max_num_tokens, std::string_view cache_dir,
          const nb::handle& vision_backend, const nb::handle& audio_backend,
-         std::string_view input_prompt_as_hint) {
+         std::string_view input_prompt_as_hint,
+         std::optional<bool> enable_speculative_decoding) {
         Backend main_backend = ParseBackend(backend);
         std::optional<Backend> vision_backend_opt = std::nullopt;
         if (!vision_backend.is_none()) {
@@ -401,6 +421,20 @@ NB_MODULE(litert_lm_ext, module) {
               std::string(cache_dir));
         }
 
+        if (enable_speculative_decoding.has_value()) {
+          AdvancedSettings advanced_settings;
+          if (settings.GetMutableMainExecutorSettings()
+                  .GetAdvancedSettings()
+                  .has_value()) {
+            advanced_settings = *settings.GetMutableMainExecutorSettings()
+                                     .GetAdvancedSettings();
+          }
+          advanced_settings.enable_speculative_decoding =
+              *enable_speculative_decoding;
+          settings.GetMutableMainExecutorSettings().SetAdvancedSettings(
+              advanced_settings);
+        }
+
         auto engine = VALUE_OR_THROW(
             EngineFactory::CreateDefault(settings, input_prompt_as_hint));
 
@@ -411,13 +445,16 @@ NB_MODULE(litert_lm_ext, module) {
         py_engine.attr("cache_dir") = cache_dir;
         py_engine.attr("vision_backend") = vision_backend;
         py_engine.attr("audio_backend") = audio_backend;
+        py_engine.attr("enable_speculative_decoding") =
+            enable_speculative_decoding;
         return py_engine;
       },
       nb::arg("model_path"), nb::arg("backend") = nb::none(),
       nb::arg("max_num_tokens") = 4096, nb::arg("cache_dir") = "",
       nb::arg("vision_backend") = nb::none(),
       nb::arg("audio_backend") = nb::none(),
-      nb::arg("input_prompt_as_hint") = "");
+      nb::arg("input_prompt_as_hint") = "",
+      nb::arg("enable_speculative_decoding") = nb::none());
 
   module.def(
       "set_min_log_severity",
@@ -769,10 +806,11 @@ NB_MODULE(litert_lm_ext, module) {
   module.def(
       "Benchmark",
       [](std::string_view model_path, const nb::handle& backend,
-         int prefill_tokens, int decode_tokens, std::string_view cache_dir) {
+         int prefill_tokens, int decode_tokens, std::string_view cache_dir,
+         std::optional<bool> enable_speculative_decoding) {
         auto benchmark = std::make_unique<Benchmark>(
             std::string(model_path), ParseBackend(backend), prefill_tokens,
-            decode_tokens, std::string(cache_dir));
+            decode_tokens, std::string(cache_dir), enable_speculative_decoding);
 
         nb::object py_benchmark = nb::cast(std::move(benchmark));
         py_benchmark.attr("model_path") = model_path;
@@ -780,11 +818,14 @@ NB_MODULE(litert_lm_ext, module) {
         py_benchmark.attr("prefill_tokens") = prefill_tokens;
         py_benchmark.attr("decode_tokens") = decode_tokens;
         py_benchmark.attr("cache_dir") = cache_dir;
+        py_benchmark.attr("enable_speculative_decoding") =
+            enable_speculative_decoding;
         return py_benchmark;
       },
       nb::arg("model_path"), nb::arg("backend") = nb::none(),
       nb::arg("prefill_tokens") = 256, nb::arg("decode_tokens") = 256,
-      nb::arg("cache_dir") = "");
+      nb::arg("cache_dir") = "",
+      nb::arg("enable_speculative_decoding") = nb::none());
 
   nb::class_<PyBenchmarkInfo>(module, "BenchmarkInfo",
                               "Data class to hold benchmark information.")

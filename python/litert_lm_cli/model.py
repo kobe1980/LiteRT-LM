@@ -147,6 +147,7 @@ class Model:
       backend: str = "cpu",
       preset: str | None = None,
       prompt: str | None = None,
+      enable_speculative_decoding: bool | None = None,
   ):
     """Runs the model interactively or with a single prompt.
 
@@ -156,6 +157,8 @@ class Model:
       preset: Path to a Python file containing tool functions and system
         instructions.
       prompt: A single prompt to run once and exit.
+      enable_speculative_decoding: Whether to enable speculative decoding. If
+        None, use the model's default.
     """
     if not self.exists():
       click.echo(
@@ -186,7 +189,11 @@ class Model:
           raise ImportError("litert_lm.adb dependencies are not available.")
         engine_cm = adb_engine.AdbEngine(self.model_path, backend=backend_val)
       else:
-        engine_cm = litert_lm.Engine(self.model_path, backend=backend_val)
+        engine_cm = litert_lm.Engine(
+            self.model_path,
+            backend=backend_val,
+            enable_speculative_decoding=enable_speculative_decoding,
+        )
 
       with (
           engine_cm as engine,
@@ -277,6 +284,7 @@ class Model:
       decode_tokens: int = 256,
       is_android: bool = False,
       backend: str = "cpu",
+      enable_speculative_decoding: bool | None = None,
   ):
     """Benchmarks the model.
 
@@ -285,6 +293,8 @@ class Model:
       decode_tokens: The number of tokens to decode.
       is_android: Whether to run the benchmark on an Android device via ADB.
       backend: The backend to use (cpu or gpu).
+      enable_speculative_decoding: Whether to enable speculative decoding. If
+        None, use the model's default.
     """
     if not self.exists():
       click.echo(
@@ -315,12 +325,20 @@ class Model:
             prefill_tokens=prefill_tokens,
             decode_tokens=decode_tokens,
             cache_dir=":nocache",
+            enable_speculative_decoding=enable_speculative_decoding,
         )
 
       click.echo(f"Benchmarking model: {self.to_str()} ({self.model_path})")
       click.echo(f"Number of tokens in prefill: {prefill_tokens}")
       click.echo(f"Number of tokens in decode : {decode_tokens}")
       click.echo(f"Backend                    : {backend}")
+
+      spec_dec_str = "auto"
+      if enable_speculative_decoding is True:
+        spec_dec_str = "true"
+      elif enable_speculative_decoding is False:
+        spec_dec_str = "false"
+      print(f"Speculative decoding       : {spec_dec_str}")
       if is_android:
         click.echo("Target                     : Android")
 

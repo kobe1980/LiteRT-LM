@@ -252,15 +252,61 @@ def rename(old_model_id, new_model_id):
   )
 
 
+def parse_speculative_decoding(unused_ctx, unused_param, value):
+  """Click callback to parse speculative decoding mode strings into bool | None.
+
+  Args:
+    unused_ctx: The click context.
+    unused_param: The click parameter.
+    value: The value to parse ("auto", "true", or "false").
+
+  Returns:
+    True for "true", False for "false", and None for "auto".
+  """
+  if value is None:
+    return None
+  value_lower = value.lower()
+  if value_lower == "auto":
+    return None
+  elif value_lower == "true":
+    return True
+  elif value_lower == "false":
+    return False
+  return value
+
+
+def common_inference_options(f):
+  """Decorator for common options shared across commands."""
+  f = click.option(
+      "--verbose",
+      is_flag=True,
+      default=False,
+      help="Whether to enable verbose logging.",
+  )(f)
+  f = click.option(
+      "--enable-speculative-decoding",
+      type=click.Choice(["auto", "true", "false"], case_sensitive=False),
+      default="auto",
+      callback=parse_speculative_decoding,
+      help="""\b
+Speculative decoding mode ("auto", "true", "false").
+  - auto: Automatically determine the speculative decoding behavior from the model metadata.
+  - true: Force enable speculative decoding. It will throw an error if the model does not support it.
+  - false: Force disable speculative decoding.
+""",
+  )(f)
+  f = click.option(
+      "-b",
+      "--backend",
+      type=click.Choice(["cpu", "gpu"], case_sensitive=False),
+      default="cpu",
+      help="The backend to use.",
+  )(f)
+  return f
+
+
 @cli.command(help="Benchmarks a LiteRT-LM model.")
 @click.argument("model_reference")
-@click.option(
-    "-b",
-    "--backend",
-    type=click.Choice(["cpu", "gpu"], case_sensitive=False),
-    default="cpu",
-    help="The backend to use.",
-)
 @click.option(
     "-p",
     "--prefill_tokens",
@@ -275,18 +321,14 @@ def rename(old_model_id, new_model_id):
     type=int,
     help="The number of tokens to decode.",
 )
-@click.option(
-    "--verbose",
-    is_flag=True,
-    default=False,
-    help="Whether to enable verbose logging.",
-)
+@common_inference_options
 def benchmark(
     model_reference: str,
     prefill_tokens: int = 256,
     decode_tokens: int = 256,
-    android: bool = False,
     backend: str = "cpu",
+    android: bool = False,
+    enable_speculative_decoding: bool | None = None,
     verbose: bool = False,
 ):
   """Benchmarks a LiteRT-LM model.
@@ -297,6 +339,9 @@ def benchmark(
     prefill_tokens: The number of tokens to prefill.
     decode_tokens: The number of tokens to decode.
     backend: The backend to use (cpu or gpu).
+    android: Run on Android via ADB.
+    enable_speculative_decoding: Speculative decoding mode (True, False, or None
+      for auto).
     verbose: Whether to enable verbose logging.
   """
   if verbose:
@@ -308,6 +353,7 @@ def benchmark(
       decode_tokens=decode_tokens,
       is_android=android,
       backend=backend,
+      enable_speculative_decoding=enable_speculative_decoding,
   )
 
 
@@ -333,13 +379,6 @@ def benchmark(
 )
 @click.argument("model_reference")
 @click.option(
-    "-b",
-    "--backend",
-    type=click.Choice(["cpu", "gpu"], case_sensitive=False),
-    default="cpu",
-    help="The backend to use.",
-)
-@click.option(
     "--prompt", default=None, help="A single prompt to run once and exit."
 )
 @click.option(
@@ -351,18 +390,14 @@ def benchmark(
         " instructions."
     ),
 )
-@click.option(
-    "--verbose",
-    is_flag=True,
-    default=False,
-    help="Whether to enable verbose logging.",
-)
+@common_inference_options
 def run(
     model_reference,
     prompt=None,
-    android=False,
-    backend="cpu",
     preset=None,
+    backend="cpu",
+    android=False,
+    enable_speculative_decoding=None,
     verbose=False,
 ):
   r"""Runs a LiteRT-LM model interactively or with a single prompt.
@@ -371,9 +406,12 @@ def run(
     model_reference: A relative or absolute path to a .litertlm model file, or a
       model ID from `litert-lm list`.
     prompt: A single prompt to run once and exit.
-    backend: The backend to use (cpu or gpu).
     preset: Path to a Python file containing tool functions and system
       instructions.
+    backend: The backend to use (cpu or gpu).
+    android: Run on Android via ADB.
+    enable_speculative_decoding: Speculative decoding mode (True, False, or None
+      for auto).
     verbose: Whether to enable verbose logging.
   """
   if verbose:
@@ -408,6 +446,7 @@ def run(
       is_android=android,
       backend=backend,
       preset=preset,
+      enable_speculative_decoding=enable_speculative_decoding,
   )
 
 

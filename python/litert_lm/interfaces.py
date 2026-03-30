@@ -73,6 +73,10 @@ class AbstractEngine(abc.ABC):
       cache_dir: Directory for caching compiled model artifacts.
       vision_backend: The hardware backend used for vision encoding.
       audio_backend: The hardware backend used for audio encoding.
+      enable_speculative_decoding: Whether to enable speculative decoding. If
+        None, use the model's default. If True, enable speculative decoding; an
+        error will be thrown if the model does not support it. If False, disable
+        it.
   """
 
   model_path: str
@@ -81,6 +85,7 @@ class AbstractEngine(abc.ABC):
   cache_dir: str = ""
   vision_backend: Backend | None = None
   audio_backend: Backend | None = None
+  enable_speculative_decoding: bool | None = None
 
   def __enter__(self) -> AbstractEngine:
     """Initializes the engine resources."""
@@ -234,6 +239,10 @@ class AbstractBenchmark(abc.ABC):
       prefill_tokens: Number of tokens for the prefill phase.
       decode_tokens: Number of tokens for the decode phase.
       cache_dir: Directory for caching compiled model artifacts.
+      enable_speculative_decoding: Whether to enable speculative decoding. If
+        None, use the model's default. If True, enable speculative decoding; an
+        error will be thrown if the model does not support it. If False, disable
+        it.
   """
 
   model_path: str
@@ -241,6 +250,7 @@ class AbstractBenchmark(abc.ABC):
   prefill_tokens: int = 256
   decode_tokens: int = 256
   cache_dir: str = ""
+  enable_speculative_decoding: bool | None = None
 
   @abc.abstractmethod
   def run(self) -> BenchmarkInfo:

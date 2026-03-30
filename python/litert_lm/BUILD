@@ -79,6 +79,7 @@ cc_binary(
         "//runtime/engine:engine_settings",
         "//runtime/engine:io_types",
         "//runtime/executor:executor_settings_base",
+        "//runtime/executor:llm_executor_settings",
         "@rules_python//python/cc:current_py_cc_headers",  # buildcleaner: keep
         "@litert//tflite:minimal_logging",
     ],
