@@ -218,6 +218,7 @@ py_wheel(
         "@rules_python//python/config_settings:is_python_3.11": "cp311",
         "@rules_python//python/config_settings:is_python_3.12": "cp312",
         "@rules_python//python/config_settings:is_python_3.13": "cp313",
+        "@rules_python//python/config_settings:is_python_3.14": "cp314",
         "//conditions:default": "none",
     }),
     distribution = select({
@@ -236,6 +237,7 @@ py_wheel(
         "@rules_python//python/config_settings:is_python_3.11": "cp311",
         "@rules_python//python/config_settings:is_python_3.12": "cp312",
         "@rules_python//python/config_settings:is_python_3.13": "cp313",
+        "@rules_python//python/config_settings:is_python_3.14": "cp314",
         "//conditions:default": "py3",
     }),
     summary = "LiteRT-LM inference library",
@@ -248,6 +250,7 @@ py_wheel(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: POSIX :: Linux",
         "Operating System :: Microsoft :: Windows",

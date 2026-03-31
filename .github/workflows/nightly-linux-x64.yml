@@ -26,7 +26,7 @@ jobs:
       PUBLISH_TO_PYPI: ${{ (github.event_name == 'schedule' || github.event.inputs.publish_to_pypi == 'true') && 'true' || 'false' }}
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - name: Checkout code.
         uses: actions/checkout@v4
