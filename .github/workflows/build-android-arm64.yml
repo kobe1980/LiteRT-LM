@@ -47,32 +47,33 @@ jobs:
         run: |
           bazel sync --configure
 
-      - name: Patch fetched nlohmann_json headers
+      - name: Locate and patch nlohmann_json headers
         run: |
           set -eux
 
           OUTPUT_BASE="$(bazel info output_base)"
-          TO_JSON="$OUTPUT_BASE/external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"
-          FROM_JSON="$OUTPUT_BASE/external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"
 
+          TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
+          FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
+
+          echo "TO_JSON=$TO_JSON"
+          echo "FROM_JSON=$FROM_JSON"
+
+          test -n "$TO_JSON"
+          test -n "$FROM_JSON"
           test -f "$TO_JSON"
           test -f "$FROM_JSON"
 
-          python3 - <<'PY'
-          import os
+          python3 - "$TO_JSON" "$FROM_JSON" <<'PY'
+          import sys
           from pathlib import Path
 
-          output_base = os.popen("bazel info output_base").read().strip()
-          files = [
-              Path(output_base) / "external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp",
-              Path(output_base) / "external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp",
-          ]
-
-          for path in files:
+          for raw in sys.argv[1:]:
+              path = Path(raw)
               text = path.read_text()
               text = text.replace(
                   "#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM",
-                  "#if 0 /* disabled for Android NDK char8_t/filesystem compatibility */"
+                  "#if 0 /* disabled for Android NDK filesystem/char8_t compatibility */"
               )
               path.write_text(text)
               print(f"patched {path}")
