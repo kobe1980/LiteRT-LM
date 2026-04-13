@@ -52,10 +52,9 @@ jobs:
           set -eux
 
           OUTPUT_BASE="$(bazel info output_base)"
-          TO_JSON="$OUTPUT_BASE/external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"
-          FROM_JSON="$OUTPUT_BASE/external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"
+          TO_JSON="$OUTPUT_BASE/external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"
+          FROM_JSON="$OUTPUT_BASE/external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"
 
-          ls -la "$OUTPUT_BASE/external" || true
           test -f "$TO_JSON"
           test -f "$FROM_JSON"
 
@@ -65,8 +64,8 @@ jobs:
 
           output_base = os.popen("bazel info output_base").read().strip()
           files = [
-              Path(output_base) / "external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp",
-              Path(output_base) / "external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp",
+              Path(output_base) / "external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp",
+              Path(output_base) / "external/org_tensorflow/third_party/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp",
           ]
 
           for path in files:
@@ -84,7 +83,9 @@ jobs:
 
       - name: Build litert_lm_main for Android ARM64
         run: |
-          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
+          bazel build \
+            --config=android_arm64 \
+            //runtime/engine:litert_lm_main
 
       - name: Collect artifact
         run: |
