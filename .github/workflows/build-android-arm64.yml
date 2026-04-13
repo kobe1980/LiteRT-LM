@@ -9,9 +9,10 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - name: Checkout
+      - name: Checkout upstream LiteRT-LM
         uses: actions/checkout@v4
         with:
+          repository: google-ai-edge/LiteRT-LM
           ref: v0.10.1
           lfs: true
           submodules: recursive
