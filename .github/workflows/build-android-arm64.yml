@@ -43,12 +43,42 @@ jobs:
       - name: Set up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
 
+      - name: Patch nlohmann_json filesystem conversions
+        run: |
+          set -eux
+          TO_JSON="external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"
+          FROM_JSON="external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"
+
+          test -f "$TO_JSON"
+          test -f "$FROM_JSON"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path("external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"),
+              Path("external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"),
+          ]
+
+          for path in files:
+              text = path.read_text()
+
+              text = text.replace(
+                  "#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM",
+                  "#if 0 /* disabled for Android NDK char8_t/filesystem compatibility */"
+              )
+
+              path.write_text(text)
+              print(f"patched {path}")
+          PY
+
+          grep -n "#if 0" "$TO_JSON" | head
+          grep -n "#if 0" "$FROM_JSON" | head
+
       - name: Build litert_lm_main for Android ARM64
         run: |
           bazel build \
             --config=android_arm64 \
-            --cxxopt=-fno-char8_t \
-            --host_cxxopt=-fno-char8_t \
             //runtime/engine:litert_lm_main
 
       - name: Collect artifact
@@ -56,6 +86,7 @@ jobs:
           mkdir -p out
           cp -f bazel-bin/runtime/engine/litert_lm_main out/litert_lm_main
           ls -lh out
+          file out/litert_lm_main || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
