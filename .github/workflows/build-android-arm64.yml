@@ -43,31 +43,38 @@ jobs:
       - name: Set up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
 
-      - name: Patch nlohmann_json filesystem conversions
+      - name: Prefetch external dependencies
+        run: |
+          bazel sync --configure
+
+      - name: Patch fetched nlohmann_json headers
         run: |
           set -eux
-          TO_JSON="external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"
-          FROM_JSON="external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"
 
+          OUTPUT_BASE="$(bazel info output_base)"
+          TO_JSON="$OUTPUT_BASE/external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"
+          FROM_JSON="$OUTPUT_BASE/external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"
+
+          ls -la "$OUTPUT_BASE/external" || true
           test -f "$TO_JSON"
           test -f "$FROM_JSON"
 
           python3 - <<'PY'
+          import os
           from pathlib import Path
 
+          output_base = os.popen("bazel info output_base").read().strip()
           files = [
-              Path("external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp"),
-              Path("external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp"),
+              Path(output_base) / "external/nlohmann_json/include/nlohmann/detail/conversions/to_json.hpp",
+              Path(output_base) / "external/nlohmann_json/include/nlohmann/detail/conversions/from_json.hpp",
           ]
 
           for path in files:
               text = path.read_text()
-
               text = text.replace(
                   "#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM",
                   "#if 0 /* disabled for Android NDK char8_t/filesystem compatibility */"
               )
-
               path.write_text(text)
               print(f"patched {path}")
           PY
@@ -77,9 +84,7 @@ jobs:
 
       - name: Build litert_lm_main for Android ARM64
         run: |
-          bazel build \
-            --config=android_arm64 \
-            //runtime/engine:litert_lm_main
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Collect artifact
         run: |
