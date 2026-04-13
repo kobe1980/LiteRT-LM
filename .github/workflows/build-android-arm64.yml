@@ -43,9 +43,9 @@ jobs:
       - name: Set up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
 
-      - name: Prefetch external dependencies
+      - name: Prefetch target dependencies
         run: |
-          bazel sync --configure
+          bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Locate and patch nlohmann_json headers
         run: |
@@ -53,8 +53,8 @@ jobs:
 
           OUTPUT_BASE="$(bazel info output_base)"
 
-          TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
-          FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
+          TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
+          FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
 
           echo "TO_JSON=$TO_JSON"
           echo "FROM_JSON=$FROM_JSON"
