@@ -79,6 +79,9 @@ jobs:
               print(f"patched {path}")
           PY
 
+          grep -n "#if 0" "$TO_JSON" | head
+          grep -n "#if 0" "$FROM_JSON" | head
+
       - name: Locate and patch cxx.h
         run: |
           set -eux
@@ -98,25 +101,18 @@ jobs:
           path = Path(sys.argv[1])
           text = path.read_text()
 
-          old = """#if __cplusplus >= 202002L
-#include <ranges>
-
-#endif"""
-
-          new = """#if __cplusplus >= 202002L && __has_include(<ranges>)
-#include <ranges>
-
-#endif"""
+          old = "#include <ranges>"
+          new = "#if __has_include(<ranges>)\n#include <ranges>\n#endif"
 
           if old not in text:
-              raise SystemExit("expected <ranges> block not found in cxx.h")
+              raise SystemExit("expected '#include <ranges>' not found in cxx.h")
 
           text = text.replace(old, new, 1)
           path.write_text(text)
           print(f"patched {path}")
           PY
 
-          grep -n "ranges" "$CXX_H" | head -n 5
+          grep -n "ranges" "$CXX_H" | head -n 10
 
       - name: Build litert_lm_main for Android ARM64
         run: |
