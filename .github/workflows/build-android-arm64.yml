@@ -181,9 +181,13 @@ jobs:
             exit 1
           fi
 
-          test -f "$PARSERS_H"
+          REAL_PARSERS_H="$(realpath "$PARSERS_H")"
+          echo "REAL_PARSERS_H=$REAL_PARSERS_H"
 
-          python3 - "$PARSERS_H" <<'PY'
+          test -f "$REAL_PARSERS_H"
+          chmod u+w "$REAL_PARSERS_H" || true
+
+          python3 - "$REAL_PARSERS_H" <<'PY'
           import sys
           from pathlib import Path
 
@@ -210,8 +214,8 @@ jobs:
           PY
 
           echo "Verifying patched header:"
-          grep -n '#include <ranges>' "$PARSERS_H" || true
-          grep -n '__has_include(<ranges>)' "$PARSERS_H" || true
+          grep -n '#include <ranges>' "$REAL_PARSERS_H" || true
+          grep -n '__has_include(<ranges>)' "$REAL_PARSERS_H" || true
 
       - name: Final build litert_lm_main for Android ARM64
         run: |
