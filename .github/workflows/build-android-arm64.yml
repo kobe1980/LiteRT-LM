@@ -163,50 +163,55 @@ jobs:
           set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
 
-      - name: Locate and patch generated parsers.rs.h
+      - name: Patch generated parsers.rs.h directly
         run: |
           set -eux
 
-          mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
+          PARSERS_H="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
 
-          printf 'Found parsers.rs.h files:\n'
-          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
-
-          if [ "${#PARSER_HEADERS[@]}" -eq 0 ]; then
-            echo "parsers.rs.h not found, skipping patch"
-            exit 0
+          if [ ! -f "$PARSERS_H" ]; then
+            echo "Direct path not found, trying fallback search"
+            PARSERS_H="$(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | head -n 1 || true)"
           fi
 
-          python3 - "${PARSER_HEADERS[@]}" <<'PY'
+          echo "PARSERS_H=$PARSERS_H"
+
+          if [ -z "$PARSERS_H" ]; then
+            echo "parsers.rs.h not found"
+            exit 1
+          fi
+
+          test -f "$PARSERS_H"
+
+          python3 - "$PARSERS_H" <<'PY'
           import sys
           from pathlib import Path
 
-          for raw in sys.argv[1:]:
-              path = Path(raw)
-              text = path.read_text()
-              original = text
+          path = Path(sys.argv[1])
+          text = path.read_text()
 
-              text = text.replace(
-                  "#include <ranges>",
-                  "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-              )
+          text = text.replace(
+              "#include <ranges>",
+              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+          )
 
-              text = text.replace(
-                  "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-                  "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-              )
+          text = text.replace(
+              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+          )
 
-              text = text.replace(
-                  "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-                  "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-              )
+          text = text.replace(
+              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+          )
 
-              if text != original:
-                  path.write_text(text)
-                  print(f"patched {path}")
-              else:
-                  print(f"no change needed for {path}")
+          path.write_text(text)
+          print(f"patched {path}")
           PY
+
+          echo "Verifying patched header:"
+          grep -n '#include <ranges>' "$PARSERS_H" || true
+          grep -n '__has_include(<ranges>)' "$PARSERS_H" || true
 
       - name: Final build litert_lm_main for Android ARM64
         run: |
