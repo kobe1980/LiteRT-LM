@@ -155,8 +155,8 @@ jobs:
               echo
               echo "Any old checksum still present?"
               grep -R "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5" . || true
-- name: Build
-  run: bazel build //runtime/engine:litert_lm_main
+      - name: Build
+        run: bazel build //runtime/engine:litert_lm_main
       - name: First build pass to generate bridge headers
         run: |
           set -eux
