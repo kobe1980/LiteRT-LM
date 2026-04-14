@@ -34,6 +34,29 @@ jobs:
           echo "Any old checksum still present?"
           grep -R "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5" . || true
 
+      - name: Patch gemma3_data_processor.cc for Android clang
+        run: |
+          set -eux
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("runtime/conversation/model_data_processor/gemma3_data_processor.cc")
+          text = path.read_text()
+
+          old = 'absl::string_view text_part(start, prompt_view.data() - part.size());'
+          new = 'absl::string_view text_part(start, prompt_view.data() - start);'
+
+          if old not in text:
+              raise SystemExit("expected gemma3 string_view line not found")
+
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+          print(f"patched {path}")
+          PY
+
+          grep -n 'text_part' runtime/conversation/model_data_processor/gemma3_data_processor.cc || true
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
