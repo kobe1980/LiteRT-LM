@@ -1,0 +1,263 @@
+name: Build LiteRT-LM Android ARM64 v2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-android-arm64:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout upstream LiteRT-LM
+        uses: actions/checkout@v4
+        with:
+          repository: google-ai-edge/LiteRT-LM
+          ref: v0.10.1
+          lfs: true
+          submodules: recursive
+
+      - name: Pull Git LFS files
+        run: git lfs pull
+
+      - name: Debug WORKSPACE used by CI
+        run: |
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo
+          echo "minizip block in WORKSPACE:"
+          grep -n -A 8 -B 2 'name = "minizip"' WORKSPACE || true
+          echo
+          echo "Any old zlib URL still present?"
+          grep -R "zlib.net/fossils" . || true
+          echo
+          echo "Any old checksum still present?"
+          grep -R "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5" . || true
+
+      - name: Patch gemma3_data_processor.cc for Android clang
+        run: |
+          set -eux
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("runtime/conversation/model_data_processor/gemma3_data_processor.cc")
+          text = path.read_text()
+
+          old = 'absl::string_view text_part(start, prompt_view.data() - part.size());'
+          new = 'absl::string_view text_part(start, prompt_view.data() - start);'
+
+          if old not in text:
+              raise SystemExit("expected gemma3 string_view line not found")
+
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+          print(f"patched {path}")
+          PY
+
+          grep -n 'text_part' runtime/conversation/model_data_processor/gemma3_data_processor.cc || true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK 25.2.9519653
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "ndk;25.2.9519653"
+
+      - name: Set Android env
+        run: |
+          echo "ANDROID_SDK_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> "$GITHUB_ENV"
+
+      - name: Set up Bazelisk
+        uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Prefetch target dependencies
+        run: |
+          bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
+
+      - name: Locate and patch nlohmann_json headers
+        run: |
+          set -eux
+
+          OUTPUT_BASE="$(bazel info output_base)"
+
+          TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
+          FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
+
+          echo "TO_JSON=$TO_JSON"
+          echo "FROM_JSON=$FROM_JSON"
+
+          test -n "$TO_JSON"
+          test -n "$FROM_JSON"
+          test -f "$TO_JSON"
+          test -f "$FROM_JSON"
+
+          python3 - "$TO_JSON" "$FROM_JSON" <<'PY'
+          import sys
+          from pathlib import Path
+
+          for raw in sys.argv[1:]:
+              path = Path(raw)
+              text = path.read_text()
+              text = text.replace(
+                  "#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM",
+                  "#if 0 /* disabled for Android NDK filesystem/char8_t compatibility */"
+              )
+              path.write_text(text)
+              print(f"patched {path}")
+          PY
+
+      - name: Locate and patch cxx.h
+        run: |
+          set -eux
+
+          OUTPUT_BASE="$(bazel info output_base)"
+          CXX_H="$(find "$OUTPUT_BASE/external" -path '*/crate_index__cxx-*/include/cxx.h' | head -n 1)"
+
+          echo "CXX_H=$CXX_H"
+
+          test -n "$CXX_H"
+          test -f "$CXX_H"
+
+          python3 - "$CXX_H" <<'PY'
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          text = path.read_text()
+
+          if "#include <ranges>" not in text:
+              raise SystemExit("expected '#include <ranges>' not found in cxx.h")
+
+          text = text.replace(
+              "#include <ranges>",
+              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+              1,
+          )
+
+          text = text.replace(
+              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+          )
+
+          text = text.replace(
+              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+          )
+
+          path.write_text(text)
+          print(f"patched {path}")
+          PY
+
+      - name: First build pass to generate bridge headers
+        run: |
+          set -eux
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
+
+      - name: Patch generated parser headers
+        run: |
+          set -eux
+
+          mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
+
+          printf 'Found parser headers:\n'
+          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
+
+          if [ "${#PARSER_HEADERS[@]}" -eq 0 ]; then
+            echo "parsers.rs.h not found"
+            exit 1
+          fi
+
+          for p in "${PARSER_HEADERS[@]}"; do
+            rp="$(realpath "$p")"
+            echo "Patching $rp"
+            chmod u+w "$rp" || true
+            python3 - "$rp" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+text = text.replace(
+    "#include <ranges>",
+    "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+)
+text = text.replace(
+    "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+)
+text = text.replace(
+    "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+)
+path.write_text(text)
+print(f"patched {path}")
+PY
+          done
+
+          echo "Remaining raw includes after patch:"
+          grep -R -n '^#include <ranges>$' bazel-out/*/bin/runtime/components/tool_use/rust/parsers.rs.h || true
+
+      - name: Final build litert_lm_main for Android ARM64 with retry
+        run: |
+          set -eux
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main && exit 0
+
+          echo "First final build failed, re-patching generated parser headers"
+
+          mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
+          printf 'Headers before retry:\n'
+          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
+
+          for p in "${PARSER_HEADERS[@]}"; do
+            rp="$(realpath "$p")"
+            chmod u+w "$rp" || true
+            python3 - "$rp" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+text = text.replace(
+    "#include <ranges>",
+    "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+)
+text = text.replace(
+    "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+)
+text = text.replace(
+    "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+)
+path.write_text(text)
+print(f"repatched {path}")
+PY
+          done
+
+          echo "Remaining raw includes before retry build:"
+          grep -R -n '^#include <ranges>$' bazel-out/*/bin/runtime/components/tool_use/rust/parsers.rs.h || true
+
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
+
+      - name: Collect artifact
+        run: |
+          mkdir -p out
+          cp -f bazel-bin/runtime/engine/litert_lm_main out/litert_lm_main
+          ls -lh out
+          file out/litert_lm_main || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: litert-lm-android-arm64
+          path: out/litert_lm_main
