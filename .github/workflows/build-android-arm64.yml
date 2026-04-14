@@ -182,26 +182,26 @@ jobs:
             echo "Patching $rp"
             chmod u+w "$rp" || true
             python3 - "$rp" <<'PY'
-import sys
-from pathlib import Path
+          import sys
+          from pathlib import Path
 
-path = Path(sys.argv[1])
-text = path.read_text()
-text = text.replace(
-    "#include <ranges>",
-    "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-)
-text = text.replace(
-    "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-    "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-)
-text = text.replace(
-    "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-    "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-)
-path.write_text(text)
-print(f"patched {path}")
-PY
+          path = Path(sys.argv[1])
+          text = path.read_text()
+          text = text.replace(
+              "#include <ranges>",
+              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+          )
+          text = text.replace(
+              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+          )
+          text = text.replace(
+              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+          )
+          path.write_text(text)
+          print(f"patched {path}")
+          PY
           done
 
           echo "Remaining raw includes after patch:"
@@ -222,26 +222,26 @@ PY
             rp="$(realpath "$p")"
             chmod u+w "$rp" || true
             python3 - "$rp" <<'PY'
-import sys
-from pathlib import Path
+          import sys
+          from pathlib import Path
 
-path = Path(sys.argv[1])
-text = path.read_text()
-text = text.replace(
-    "#include <ranges>",
-    "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-)
-text = text.replace(
-    "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-    "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-)
-text = text.replace(
-    "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-    "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-)
-path.write_text(text)
-print(f"repatched {path}")
-PY
+          path = Path(sys.argv[1])
+          text = path.read_text()
+          text = text.replace(
+              "#include <ranges>",
+              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+          )
+          text = text.replace(
+              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+          )
+          text = text.replace(
+              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+          )
+          path.write_text(text)
+          print(f"repatched {path}")
+          PY
           done
 
           echo "Remaining raw includes before retry build:"
