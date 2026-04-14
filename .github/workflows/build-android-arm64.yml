@@ -20,6 +20,28 @@ jobs:
       - name: Pull Git LFS files
         run: git lfs pull
 
+      - name: Patch WORKSPACE minizip checksum
+        run: |
+          set -eux
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("WORKSPACE")
+          text = path.read_text()
+
+          old = 'sha256 = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"'
+          new = 'sha256 = "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5"'
+
+          if old not in text:
+              raise SystemExit("expected minizip sha256 not found in WORKSPACE")
+
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+          print("patched WORKSPACE minizip sha256")
+          PY
+
+          grep -n 'name = "minizip"' -A5 WORKSPACE
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -164,9 +186,6 @@ jobs:
           path.write_text(text)
           print(f"patched {path}")
           PY
-
-          grep -n "ranges" "$PARSERS_H" | head -n 20 || true
-          grep -n "contiguous" "$PARSERS_H" | head -n 20 || true
 
       - name: Final build litert_lm_main for Android ARM64
         run: |
