@@ -101,18 +101,33 @@ jobs:
           path = Path(sys.argv[1])
           text = path.read_text()
 
-          old = "#include <ranges>"
-          new = "#if __has_include(<ranges>)\n#include <ranges>\n#endif"
-
-          if old not in text:
+          if "#include <ranges>" not in text:
               raise SystemExit("expected '#include <ranges>' not found in cxx.h")
 
-          text = text.replace(old, new, 1)
+          text = text.replace(
+              "#include <ranges>",
+              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+              1,
+          )
+
+          text = text.replace(
+              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+              1,
+          )
+
+          text = text.replace(
+              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+              1,
+          )
+
           path.write_text(text)
           print(f"patched {path}")
           PY
 
-          grep -n "ranges" "$CXX_H" | head -n 10
+          grep -n "ranges" "$CXX_H" | head -n 20
+          grep -n "contiguous" "$CXX_H" | head -n 20
 
       - name: Build litert_lm_main for Android ARM64
         run: |
