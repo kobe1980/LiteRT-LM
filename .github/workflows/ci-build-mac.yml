@@ -15,7 +15,6 @@ on:
         type: boolean
         default: true
 
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -33,6 +32,7 @@ jobs:
       MODEL_URL: https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.litertlm
 
       GH_TOKEN: ${{ github.token }}  # For gh release upload.
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       REFRESH_CACHE: ${{ github.event_name == 'schedule' ||
                          (github.event_name == 'workflow_dispatch' && inputs.REFRESH_CACHE) }}
     steps:
@@ -87,8 +87,7 @@ jobs:
           STEPS_BAZEL_CACHE_OUTPUTS_CACHE_MATCHED_KEY: ${{ steps.bazel-cache.outputs.cache-matched-key }}
 
       - name: Download Model
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        if: env.HF_TOKEN != ''
         run: |
           mkdir -p ./models
           echo "Downloading model from Hugging Face..."
@@ -97,6 +96,12 @@ jobs:
             -o ${{ env.MODEL_PATH }} \
             "${{ env.MODEL_URL }}"
           ls -lh ${{ env.MODEL_PATH }}
+
+      - name: Skip model download when HF token is missing
+        if: env.HF_TOKEN == ''
+        run: |
+          echo "HF_TOKEN is not configured."
+          echo "Skipping Hugging Face model download and pytest."
 
       - name: Run bazel build on MacOS.
         run: |
@@ -115,9 +120,11 @@ jobs:
           bazel test --disk_cache=~/.cache/bazel-macos --test_output=errors //...
 
       - name: Install pytest
+        if: env.HF_TOKEN != ''
         run: python3 -m pip install --break-system-packages pytest==8.3.4
 
       - name: Run pytest
+        if: env.HF_TOKEN != ''
         run: pytest tools/test/ --model-path=${{ env.MODEL_PATH }} --build-system=bazel
 
       - name: Run bazel build on MacOS with dynamic linking.
