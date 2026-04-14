@@ -352,7 +352,7 @@ http_archive(
     build_file = "@//:BUILD.minizip",
     sha256 = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
     strip_prefix = "zlib-1.3.1/contrib/minizip",
-    url = "https://zlib.net/fossils/zlib-1.3.1.tar.gz",
+    url = "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz",
 )
 
 http_archive(
