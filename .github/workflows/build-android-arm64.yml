@@ -6,7 +6,7 @@ on:
 jobs:
   build-android-arm64:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - name: Checkout upstream LiteRT-LM
@@ -110,29 +110,27 @@ jobs:
           text = text.replace(
               "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
               "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-              1,
           )
 
           text = text.replace(
               "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
               "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-              1,
           )
 
           path.write_text(text)
           print(f"patched {path}")
           PY
 
-      - name: Warm up rust bridge generated headers
+      - name: First build pass to generate bridge headers
         run: |
           set -eux
-          bazel build --config=android_arm64 //runtime/components/tool_use/rust:parsers_cpp || true
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
 
       - name: Locate and patch generated parsers.rs.h
         run: |
           set -eux
 
-          PARSERS_H="$(find bazel-out -path '*/bin/runtime/components/tool_use/rust/parsers.rs.h' | head -n 1)"
+          PARSERS_H="$(find . bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | head -n 1)"
 
           echo "PARSERS_H=$PARSERS_H"
 
@@ -170,7 +168,7 @@ jobs:
           grep -n "ranges" "$PARSERS_H" | head -n 20 || true
           grep -n "contiguous" "$PARSERS_H" | head -n 20 || true
 
-      - name: Build litert_lm_main for Android ARM64
+      - name: Final build litert_lm_main for Android ARM64
         run: |
           bazel build \
             --config=android_arm64 \
