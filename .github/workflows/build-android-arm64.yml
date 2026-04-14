@@ -20,27 +20,19 @@ jobs:
       - name: Pull Git LFS files
         run: git lfs pull
 
-      - name: Patch WORKSPACE minizip checksum
+      - name: Debug WORKSPACE used by CI
         run: |
-          set -eux
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("WORKSPACE")
-          text = path.read_text()
-
-          old = 'sha256 = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"'
-          new = 'sha256 = "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5"'
-
-          if old not in text:
-              raise SystemExit("expected minizip sha256 not found in WORKSPACE")
-
-          text = text.replace(old, new, 1)
-          path.write_text(text)
-          print("patched WORKSPACE minizip sha256")
-          PY
-
-          grep -n 'name = "minizip"' -A5 WORKSPACE
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo
+          echo "minizip block in WORKSPACE:"
+          grep -n -A 8 -B 2 'name = "minizip"' WORKSPACE || true
+          echo
+          echo "Any old zlib URL still present?"
+          grep -R "zlib.net/fossils" . || true
+          echo
+          echo "Any old checksum still present?"
+          grep -R "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5" . || true
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -142,21 +134,7 @@ jobs:
           path.write_text(text)
           print(f"patched {path}")
           PY
-      - name: Debug WORKSPACE used by CI
-        run: |
-              echo "GITHUB_SHA=$GITHUB_SHA"
-              echo "HEAD=$(git rev-parse HEAD)"
-              echo
-              echo "minizip block in WORKSPACE:"
-              grep -n -A 8 -B 2 'name = "minizip"' WORKSPACE || true
-              echo
-              echo "Any old zlib URL still present?"
-              grep -R "zlib.net/fossils" . || true
-              echo
-              echo "Any old checksum still present?"
-              grep -R "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5" . || true
-      - name: Build
-        run: bazel build //runtime/engine:litert_lm_main
+
       - name: First build pass to generate bridge headers
         run: |
           set -eux
