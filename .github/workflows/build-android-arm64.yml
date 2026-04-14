@@ -1,4 +1,4 @@
-name: Build LiteRT-LM Android ARM64
+name: Build LiteRT-LM Android ARM64 v2
 
 on:
   workflow_dispatch:
@@ -163,65 +163,91 @@ jobs:
           set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
 
-      - name: Patch generated parsers.rs.h directly
+      - name: Patch generated parser headers
         run: |
           set -eux
 
-          PARSERS_H="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
+          mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
 
-          if [ ! -f "$PARSERS_H" ]; then
-            echo "Direct path not found, trying fallback search"
-            PARSERS_H="$(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | head -n 1 || true)"
-          fi
+          printf 'Found parser headers:\n'
+          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
 
-          echo "PARSERS_H=$PARSERS_H"
-
-          if [ -z "$PARSERS_H" ]; then
+          if [ "${#PARSER_HEADERS[@]}" -eq 0 ]; then
             echo "parsers.rs.h not found"
             exit 1
           fi
 
-          REAL_PARSERS_H="$(realpath "$PARSERS_H")"
-          echo "REAL_PARSERS_H=$REAL_PARSERS_H"
+          for p in "${PARSER_HEADERS[@]}"; do
+            rp="$(realpath "$p")"
+            echo "Patching $rp"
+            chmod u+w "$rp" || true
+            python3 - "$rp" <<'PY'
+import sys
+from pathlib import Path
 
-          test -f "$REAL_PARSERS_H"
-          chmod u+w "$REAL_PARSERS_H" || true
+path = Path(sys.argv[1])
+text = path.read_text()
+text = text.replace(
+    "#include <ranges>",
+    "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+)
+text = text.replace(
+    "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+)
+text = text.replace(
+    "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+)
+path.write_text(text)
+print(f"patched {path}")
+PY
+          done
 
-          python3 - "$REAL_PARSERS_H" <<'PY'
-          import sys
-          from pathlib import Path
+          echo "Remaining raw includes after patch:"
+          grep -R -n '^#include <ranges>$' bazel-out/*/bin/runtime/components/tool_use/rust/parsers.rs.h || true
 
-          path = Path(sys.argv[1])
-          text = path.read_text()
-
-          text = text.replace(
-              "#include <ranges>",
-              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-          )
-
-          text = text.replace(
-              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-          )
-
-          text = text.replace(
-              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-          )
-
-          path.write_text(text)
-          print(f"patched {path}")
-          PY
-
-          echo "Verifying patched header:"
-          grep -n '#include <ranges>' "$REAL_PARSERS_H" || true
-          grep -n '__has_include(<ranges>)' "$REAL_PARSERS_H" || true
-
-      - name: Final build litert_lm_main for Android ARM64
+      - name: Final build litert_lm_main for Android ARM64 with retry
         run: |
-          bazel build \
-            --config=android_arm64 \
-            //runtime/engine:litert_lm_main
+          set -eux
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main && exit 0
+
+          echo "First final build failed, re-patching generated parser headers"
+
+          mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
+          printf 'Headers before retry:\n'
+          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
+
+          for p in "${PARSER_HEADERS[@]}"; do
+            rp="$(realpath "$p")"
+            chmod u+w "$rp" || true
+            python3 - "$rp" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+text = text.replace(
+    "#include <ranges>",
+    "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
+)
+text = text.replace(
+    "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+)
+text = text.replace(
+    "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+    "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+)
+path.write_text(text)
+print(f"repatched {path}")
+PY
+          done
+
+          echo "Remaining raw includes before retry build:"
+          grep -R -n '^#include <ranges>$' bazel-out/*/bin/runtime/components/tool_use/rust/parsers.rs.h || true
+
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Collect artifact
         run: |
