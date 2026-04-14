@@ -144,43 +144,45 @@ jobs:
         run: |
           set -eux
 
-          PARSERS_H="$(find . bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | head -n 1)"
+          mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
 
-          echo "PARSERS_H=$PARSERS_H"
+          printf 'Found parsers.rs.h files:\n'
+          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
 
-          if [ -z "$PARSERS_H" ]; then
+          if [ "${#PARSER_HEADERS[@]}" -eq 0 ]; then
             echo "parsers.rs.h not found, skipping patch"
             exit 0
           fi
 
-          test -f "$PARSERS_H"
-
-          python3 - "$PARSERS_H" <<'PY'
+          python3 - "${PARSER_HEADERS[@]}" <<'PY'
           import sys
           from pathlib import Path
 
-          path = Path(sys.argv[1])
-          text = path.read_text()
+          for raw in sys.argv[1:]:
+              path = Path(raw)
+              text = path.read_text()
+              original = text
 
-          if "#include <ranges>" in text:
               text = text.replace(
                   "#include <ranges>",
                   "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-                  1,
               )
 
-          text = text.replace(
-              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-          )
+              text = text.replace(
+                  "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
+                  "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
+              )
 
-          text = text.replace(
-              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-          )
+              text = text.replace(
+                  "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
+                  "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
+              )
 
-          path.write_text(text)
-          print(f"patched {path}")
+              if text != original:
+                  path.write_text(text)
+                  print(f"patched {path}")
+              else:
+                  print(f"no change needed for {path}")
           PY
 
       - name: Final build litert_lm_main for Android ARM64
