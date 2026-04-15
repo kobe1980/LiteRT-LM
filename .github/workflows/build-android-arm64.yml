@@ -1,4 +1,4 @@
-name: Build LiteRT-LM Android ARM64 v4
+name: Build LiteRT-LM Android ARM64 v5
 
 on:
   workflow_dispatch:
@@ -24,42 +24,14 @@ jobs:
         run: |
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma3_data_processor.cc"
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("runtime/conversation/model_data_processor/gemma3_data_processor.cc")
-          text = path.read_text()
-          old = 'absl::string_view text_part(start, prompt_view.data() - part.size());'
-          new = 'absl::string_view text_part(start, prompt_view.data() - start);'
-
-          if old not in text:
-              raise SystemExit("expected gemma3 string_view line not found")
-
-          text = text.replace(old, new, 1)
-          path.write_text(text)
-          print(f"patched {path}")
-          PY
+          perl -0pi -e 's/\Qabsl::string_view text_part(start, prompt_view.data() - part.size());\E/absl::string_view text_part(start, prompt_view.data() - start);/g' "$FILE"
           grep -n 'text_part' "$FILE" || true
 
       - name: Patch gemma4_data_processor.cc for Android clang
         run: |
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma4_data_processor.cc"
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("runtime/conversation/model_data_processor/gemma4_data_processor.cc")
-          text = path.read_text()
-          old = 'absl::string_view text_part(start, prompt_view.data() - part.size());'
-          new = 'absl::string_view text_part(start, prompt_view.data() - start);'
-
-          if old not in text:
-              raise SystemExit("expected gemma4 string_view line not found")
-
-          text = text.replace(old, new, 1)
-          path.write_text(text)
-          print(f"patched {path}")
-          PY
+          perl -0pi -e 's/\Qabsl::string_view text_part(start, prompt_view.data() - part.size());\E/absl::string_view text_part(start, prompt_view.data() - start);/g' "$FILE"
           grep -n 'text_part' "$FILE" || true
 
       - name: Set up Java
@@ -104,22 +76,7 @@ jobs:
           test -f "$TO_JSON"
           test -f "$FROM_JSON"
 
-          python3 - "$TO_JSON" "$FROM_JSON" <<'PY'
-          import sys
-          from pathlib import Path
-
-          target = "#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM"
-          replacement = "#if 0 /* disabled for Android NDK filesystem/char8_t compatibility */"
-
-          for raw in sys.argv[1:]:
-              path = Path(raw)
-              text = path.read_text()
-              if target not in text:
-                  raise SystemExit(f"target not found in {path}")
-              text = text.replace(target, replacement, 1)
-              path.write_text(text)
-              print(f"patched {path}")
-          PY
+          perl -0pi -e 's/\Q#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM\E/#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//g if $. == 1 or 1' "$TO_JSON" "$FROM_JSON"
 
       - name: Locate and patch cxx.h
         run: |
@@ -132,35 +89,11 @@ jobs:
           test -n "$CXX_H"
           test -f "$CXX_H"
 
-          python3 - "$CXX_H" <<'PY'
-          import sys
-          from pathlib import Path
+          grep -q '#include <ranges>' "$CXX_H"
 
-          path = Path(sys.argv[1])
-          text = path.read_text()
-
-          if "#include <ranges>" not in text:
-              raise SystemExit("expected '#include <ranges>' not found in cxx.h")
-
-          text = text.replace(
-              "#include <ranges>",
-              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-              1,
-          )
-
-          text = text.replace(
-              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-          )
-
-          text = text.replace(
-              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-          )
-
-          path.write_text(text)
-          print(f"patched {path}")
-          PY
+          perl -0pi -e 's/\Q#include <ranges>\E/#if __has_include(<ranges>)\n#include <ranges>\n#endif/g' "$CXX_H"
+          perl -0pi -e 's/\Qstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\E/#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif/g' "$CXX_H"
+          perl -0pi -e 's/\Qstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\E/#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif/g' "$CXX_H"
 
       - name: First build pass to generate bridge headers
         run: |
@@ -173,106 +106,4 @@ jobs:
           mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
 
           printf 'Found parser headers:\n'
-          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
-
-          if [ "${#PARSER_HEADERS[@]}" -eq 0 ]; then
-            echo "parsers.rs.h not found yet, skipping patch"
-            exit 0
-          fi
-
-          for p in "${PARSER_HEADERS[@]}"; do
-            rp="$(realpath "$p")"
-            echo "Patching $rp"
-            chmod u+w "$rp" || true
-            python3 - "$rp" <<'PY'
-            import sys
-            from pathlib import Path
-
-            path = Path(sys.argv[1])
-            text = path.read_text()
-
-            text = text.replace(
-                "#include <ranges>",
-                "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-            )
-
-            text = text.replace(
-                "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-                "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-            )
-
-            text = text.replace(
-                "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-                "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-            )
-
-            path.write_text(text)
-            print(f"patched {path}")
-            PY
-          done
-
-          echo "Remaining raw includes after patch:"
-          grep -R -n '^#include <ranges>$' bazel-out/*/bin/runtime/components/tool_use/rust/parsers.rs.h || true
-
-      - name: Final build litert_lm_main for Android ARM64 with retry
-        run: |
-          set -eux
-          bazel build --config=android_arm64 //runtime/engine:litert_lm_main && exit 0
-
-          echo "First final build failed, re-patching generated parser headers if any"
-
-          mapfile -t PARSER_HEADERS < <(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort || true)
-          printf 'Headers before retry:\n'
-          printf '  %s\n' "${PARSER_HEADERS[@]:-<none>}"
-
-          if [ "${#PARSER_HEADERS[@]}" -gt 0 ]; then
-            for p in "${PARSER_HEADERS[@]}"; do
-              rp="$(realpath "$p")"
-              chmod u+w "$rp" || true
-              python3 - "$rp" <<'PY'
-              import sys
-              from pathlib import Path
-
-              path = Path(sys.argv[1])
-              text = path.read_text()
-
-              text = text.replace(
-                  "#include <ranges>",
-                  "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-              )
-
-              text = text.replace(
-                  "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-                  "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-              )
-
-              text = text.replace(
-                  "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-                  "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-              )
-
-              path.write_text(text)
-              print(f"repatched {path}")
-              PY
-            done
-
-            echo "Remaining raw includes before retry build:"
-            grep -R -n '^#include <ranges>$' bazel-out/*/bin/runtime/components/tool_use/rust/parsers.rs.h || true
-          else
-            echo "No parser headers found; skipping parser repatch"
-          fi
-
-          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
-
-      - name: Collect artifact
-        run: |
-          mkdir -p out
-          cp -f bazel-bin/runtime/engine/litert_lm_main out/litert_lm_main
-          ls -lh out
-          file out/litert_lm_main || true
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: litert-lm-android-arm64
-          path: out/litert_lm_main
+          printf '  %s\n' "${
