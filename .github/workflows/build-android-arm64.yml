@@ -25,14 +25,12 @@ jobs:
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma3_data_processor.cc"
           sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
-          grep -n 'text_part' "$FILE" || true
 
       - name: Patch gemma4_data_processor.cc
         run: |
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma4_data_processor.cc"
           sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
-          grep -n 'text_part' "$FILE" || true
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -66,15 +64,10 @@ jobs:
           OUTPUT_BASE="$(bazel info output_base)"
           TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
           FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
-
-          echo "TO_JSON=$TO_JSON"
-          echo "FROM_JSON=$FROM_JSON"
-
           test -n "$TO_JSON"
           test -n "$FROM_JSON"
           test -f "$TO_JSON"
           test -f "$FROM_JSON"
-
           sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$TO_JSON"
           sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$FROM_JSON"
 
@@ -83,14 +76,8 @@ jobs:
           set -eux
           OUTPUT_BASE="$(bazel info output_base)"
           CXX_H="$(find "$OUTPUT_BASE/external" -path '*/crate_index__cxx-*/include/cxx.h' | head -n 1)"
-
-          echo "CXX_H=$CXX_H"
-
           test -n "$CXX_H"
           test -f "$CXX_H"
-
-          grep -q '#include <ranges>' "$CXX_H"
-
           sed -i '/#include <ranges>/d' "$CXX_H"
           sed -i '/std::ranges::contiguous_range/d' "$CXX_H"
           sed -i '/std::contiguous_iterator/d' "$CXX_H"
@@ -104,59 +91,24 @@ jobs:
         run: |
           set -eux
 
-          patch_one() {
-            f="$1"
-            if [ ! -f "$f" ]; then
-              echo "Missing $f"
-              return 0
-            fi
+          HFILE="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
+          CFILE="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.cc"
 
-            echo "Patching $f"
-            chmod u+w "$f" || true
-
-            sed -i '/ranges/d' "$f"
-
-            echo "First 25 lines of $f after patch:"
-            sed -n '1,25p' "$f" || true
-
-            echo "Remaining ranges lines in $f:"
-            grep -n 'ranges' "$f" || true
-          }
-
-          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
-          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.cc"
-
-      - name: Final build with retry
-        run: |
-          set -eux
-
-          patch_one() {
-            f="$1"
-            if [ ! -f "$f" ]; then
-              echo "Missing $f"
-              return 0
-            fi
-
-            echo "Repatching $f"
-            chmod u+w "$f" || true
-            sed -i '/ranges/d' "$f"
-
-            echo "First 25 lines of $f after repatch:"
-            sed -n '1,25p' "$f" || true
-
-            echo "Remaining ranges lines in $f:"
-            grep -n 'ranges' "$f" || true
-          }
-
-          if bazel build --config=android_arm64 //runtime/engine:litert_lm_main; then
-            exit 0
+          if [ -f "$HFILE" ]; then
+            chmod u+w "$HFILE" || true
+            sed -i '/ranges/d' "$HFILE"
+            sed -n '1,25p' "$HFILE" || true
           fi
 
-          echo "Final build failed, retrying after parser file patch"
+          if [ -f "$CFILE" ]; then
+            chmod u+w "$CFILE" || true
+            sed -i '/ranges/d' "$CFILE"
+            sed -n '1,25p' "$CFILE" || true
+          fi
 
-          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
-          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.cc"
-
+      - name: Final build
+        run: |
+          set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Collect artifact
