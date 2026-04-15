@@ -91,24 +91,16 @@ jobs:
 
           grep -q '#include <ranges>' "$CXX_H"
 
-          sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
-          #include <ranges>\
-          #endif' "$CXX_H"
-
-          sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
-          static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
-          #endif' "$CXX_H"
-
-          sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
-          static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
-          #endif' "$CXX_H"
+          perl -0pi -e 's/\Q#include <ranges>\E/#if __has_include(<ranges>)\n#include <ranges>\n#endif/g' "$CXX_H"
+          perl -0pi -e 's/\Qstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\E/#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif/g' "$CXX_H"
+          perl -0pi -e 's/\Qstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\E/#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif/g' "$CXX_H"
 
       - name: First build pass
         run: |
           set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
 
-      - name: Patch generated parser files at fixed path if present
+      - name: Patch generated parser files if present
         run: |
           set -eux
 
@@ -122,17 +114,13 @@ jobs:
             echo "Patching $f"
             chmod u+w "$f" || true
 
-            sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
-            #include <ranges>\
-            #endif' "$f"
-            
-            sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
-            static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
-            #endif' "$f"
+            perl -0pi -e 's/\Q#include <ranges>\E/#if __has_include(<ranges>)\n#include <ranges>\n#endif/g' "$f"
+            perl -0pi -e 's/\Qstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\E/#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif/g' "$f"
+            perl -0pi -e 's/\Qstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\E/#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif/g' "$f"
 
-            sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
-            static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
-            #endif' "$f"
+            echo "Verifying $f"
+            grep -n '#include <ranges>' "$f" || true
+            grep -n '__has_include(<ranges>)' "$f" || true
           }
 
           patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
@@ -152,17 +140,13 @@ jobs:
             echo "Repatching $f"
             chmod u+w "$f" || true
 
-            sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
-            #include <ranges>\
-            #endif' "$f"
+            perl -0pi -e 's/\Q#include <ranges>\E/#if __has_include(<ranges>)\n#include <ranges>\n#endif/g' "$f"
+            perl -0pi -e 's/\Qstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\E/#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif/g' "$f"
+            perl -0pi -e 's/\Qstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\E/#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif/g' "$f"
 
-            sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
-            static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
-            #endif' "$f"
-
-            sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
-            static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
-            #endif' "$f"
+            echo "Verifying $f"
+            grep -n '#include <ranges>' "$f" || true
+            grep -n '__has_include(<ranges>)' "$f" || true
           }
 
           if bazel build --config=android_arm64 //runtime/engine:litert_lm_main; then
