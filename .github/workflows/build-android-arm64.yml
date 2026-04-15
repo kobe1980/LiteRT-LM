@@ -25,14 +25,12 @@ jobs:
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma3_data_processor.cc"
           sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
-          grep -n 'text_part' "$FILE" || true
 
       - name: Patch gemma4_data_processor.cc
         run: |
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma4_data_processor.cc"
           sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
-          grep -n 'text_part' "$FILE" || true
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -84,9 +82,11 @@ jobs:
           test -n "$CXX_H"
           test -f "$CXX_H"
 
-          sed -i '/#include <ranges>/d' "$CXX_H"
-          sed -i '/std::ranges::contiguous_range/d' "$CXX_H"
-          sed -i '/std::contiguous_iterator/d' "$CXX_H"
+          REAL_CXX_H="$(realpath "$CXX_H")"
+
+          sed -i '/#include <ranges>/d' "$REAL_CXX_H"
+          sed -i '/std::ranges::contiguous_range/d' "$REAL_CXX_H"
+          sed -i '/std::contiguous_iterator/d' "$REAL_CXX_H"
 
       - name: First build pass
         run: |
@@ -102,48 +102,39 @@ jobs:
         run: |
           set -eux
 
-          find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' | sort > /tmp/parser_files.txt || true
+          patch_one() {
+            F="$1"
+            if [ ! -e "$F" ]; then
+              echo "Missing $F"
+              return 0
+            fi
 
-          echo "Parser files found:"
-          cat /tmp/parser_files.txt || true
+            RF="$(realpath "$F")"
+            echo "Patching $F"
+            echo "Real path $RF"
 
-          while IFS= read -r f; do
-            [ -n "$f" ] || continue
-            echo "Patching $f"
-            chmod u+w "$f" || true
-            sed -i '/ranges/d' "$f"
-            echo "Top of $f after patch:"
-            sed -n '1,25p' "$f" || true
-            echo "Remaining ranges lines in $f:"
-            grep -n 'ranges' "$f" || true
-          done < /tmp/parser_files.txt
+            chmod u+w "$RF" || true
 
-      - name: Final build with retry
+            sed -i '/#include <ranges>/d' "$RF"
+            sed -i '/std::ranges::contiguous_range/d' "$RF"
+            sed -i '/std::contiguous_iterator/d' "$RF"
+
+            echo "Remaining ranges lines in real file:"
+            grep -n 'ranges' "$RF" || true
+
+            echo "Top of real file:"
+            sed -n '1,25p' "$RF" || true
+          }
+
+          while IFS= read -r F; do
+            [ -n "$F" ] || continue
+            patch_one "$F"
+          done < <(find bazel-out \( -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' \) | sort || true)
+
+      - name: Final build
         run: |
           set -eux
-
-          patch_generated() {
-            find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' | sort > /tmp/parser_files_retry.txt || true
-            echo "Parser files before retry:"
-            cat /tmp/parser_files_retry.txt || true
-
-            while IFS= read -r f; do
-              [ -n "$f" ] || continue
-              echo "Repatching $f"
-              chmod u+w "$f" || true
-              sed -i '/ranges/d' "$f"
-              echo "Top of $f after repatch:"
-              sed -n '1,25p' "$f" || true
-              echo "Remaining ranges lines in $f:"
-              grep -n 'ranges' "$f" || true
-            done < /tmp/parser_files_retry.txt
-          }
-
-          bazel build --config=android_arm64 //runtime/engine:litert_lm_main || {
-            echo "Final build failed, retrying after parser patch"
-            patch_generated
-            bazel build --config=android_arm64 //runtime/engine:litert_lm_main
-          }
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Collect artifact
         run: |
