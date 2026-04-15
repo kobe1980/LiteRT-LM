@@ -121,8 +121,7 @@ jobs:
 
           printf '%s\n' "$PARSER_LIST"
 
-          while IFS= read -r p; do
-            [ -n "$p" ] || continue
+          for p in $PARSER_LIST; do
             rp="$(realpath "$p")"
             echo "Patching $rp"
             chmod u+w "$rp" || true
@@ -138,9 +137,7 @@ jobs:
             sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
             static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
             #endif' "$rp"
-          done <<EOF
-          $PARSER_LIST
-          EOF
+          done
 
       - name: Final build with retry
         run: |
@@ -160,8 +157,7 @@ jobs:
           else
             printf '%s\n' "$PARSER_LIST"
 
-            while IFS= read -r p; do
-              [ -n "$p" ] || continue
+            for p in $PARSER_LIST; do
               rp="$(realpath "$p")"
               echo "Repatching $rp"
               chmod u+w "$rp" || true
@@ -177,10 +173,8 @@ jobs:
               sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
               static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
               #endif' "$rp"
-            done <<EOF
-            $PARSER_LIST
-            EOF
-            fi
+            done
+          fi
 
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main
 
