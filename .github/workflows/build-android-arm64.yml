@@ -24,14 +24,14 @@ jobs:
         run: |
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma3_data_processor.cc"
-          perl -0pi -e 's/\Qabsl::string_view text_part(start, prompt_view.data() - part.size());\E/absl::string_view text_part(start, prompt_view.data() - start);/g' "$FILE"
+          sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
           grep -n 'text_part' "$FILE" || true
 
       - name: Patch gemma4_data_processor.cc
         run: |
           set -eux
           FILE="runtime/conversation/model_data_processor/gemma4_data_processor.cc"
-          perl -0pi -e 's/\Qabsl::string_view text_part(start, prompt_view.data() - part.size());\E/absl::string_view text_part(start, prompt_view.data() - start);/g' "$FILE"
+          sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
           grep -n 'text_part' "$FILE" || true
 
       - name: Set up Java
@@ -58,8 +58,7 @@ jobs:
         uses: bazelbuild/setup-bazelisk@v3
 
       - name: Prefetch target dependencies
-        run: |
-          bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
+        run: bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Patch nlohmann_json headers
         run: |
@@ -76,7 +75,8 @@ jobs:
           test -f "$TO_JSON"
           test -f "$FROM_JSON"
 
-          perl -0pi -e 's/\Q#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM\E/#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//g' "$TO_JSON" "$FROM_JSON"
+          sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$TO_JSON"
+          sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$FROM_JSON"
 
       - name: Patch cxx.h
         run: |
@@ -91,4 +91,108 @@ jobs:
 
           grep -q '#include <ranges>' "$CXX_H"
 
-          perl -0pi -e 's/\Q#include <ranges>\E/#if __has_include(<ranges>)\n#include <ranges>\n#endif/g
+          sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
+          #include <ranges>\
+          #endif' "$CXX_H"
+
+          sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
+          static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
+          #endif' "$CXX_H"
+
+          sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
+          static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
+          #endif' "$CXX_H"
+
+      - name: First build pass
+        run: |
+          set -eux
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
+
+      - name: Patch parser headers if present
+        run: |
+          set -eux
+          PARSER_LIST="$(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' | sort || true)"
+
+          echo "Found parser headers:"
+          if [ -z "$PARSER_LIST" ]; then
+            echo "  <none>"
+            exit 0
+          fi
+
+          printf '%s\n' "$PARSER_LIST"
+
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            rp="$(realpath "$p")"
+            echo "Patching $rp"
+            chmod u+w "$rp" || true
+
+            sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
+            #include <ranges>\
+            #endif' "$rp"
+
+            sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
+            static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
+            #endif' "$rp"
+
+            sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
+            static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
+            #endif' "$rp"
+          done <<EOF
+          $PARSER_LIST
+          EOF
+
+      - name: Final build with retry
+        run: |
+          set -eux
+
+          if bazel build --config=android_arm64 //runtime/engine:litert_lm_main; then
+            exit 0
+          fi
+
+          echo "Final build failed, retrying after parser header patch"
+
+          PARSER_LIST="$(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' | sort || true)"
+
+          echo "Headers before retry:"
+          if [ -z "$PARSER_LIST" ]; then
+            echo "  <none>"
+          else
+            printf '%s\n' "$PARSER_LIST"
+
+            while IFS= read -r p; do
+              [ -n "$p" ] || continue
+              rp="$(realpath "$p")"
+              echo "Repatching $rp"
+              chmod u+w "$rp" || true
+
+              sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
+              #include <ranges>\
+              #endif' "$rp"
+
+              sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
+              static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
+              #endif' "$rp"
+
+              sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
+              static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
+              #endif' "$rp"
+            done <<EOF
+            $PARSER_LIST
+            EOF
+            fi
+
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
+
+      - name: Collect artifact
+        run: |
+          mkdir -p out
+          cp -f bazel-bin/runtime/engine/litert_lm_main out/litert_lm_main
+          ls -lh out
+          file out/litert_lm_main || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: litert-lm-android-arm64
+          path: out/litert_lm_main
