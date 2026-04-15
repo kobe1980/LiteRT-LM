@@ -67,9 +67,6 @@ jobs:
           TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
           FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
 
-          echo "TO_JSON=$TO_JSON"
-          echo "FROM_JSON=$FROM_JSON"
-
           test -n "$TO_JSON"
           test -n "$FROM_JSON"
           test -f "$TO_JSON"
@@ -84,12 +81,8 @@ jobs:
           OUTPUT_BASE="$(bazel info output_base)"
           CXX_H="$(find "$OUTPUT_BASE/external" -path '*/crate_index__cxx-*/include/cxx.h' | head -n 1)"
 
-          echo "CXX_H=$CXX_H"
-
           test -n "$CXX_H"
           test -f "$CXX_H"
-
-          grep -q '#include <ranges>' "$CXX_H"
 
           sed -i '/#include <ranges>/d' "$CXX_H"
           sed -i '/std::ranges::contiguous_range/d' "$CXX_H"
@@ -100,7 +93,7 @@ jobs:
           set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
 
-      - name: Force generate parser files
+      - name: Force generate parsers_cpp
         run: |
           set -eux
           bazel build --config=android_arm64 //runtime/components/tool_use/rust:parsers_cpp || true
@@ -109,35 +102,48 @@ jobs:
         run: |
           set -eux
 
-          HFILE="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
-          CFILE="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.cc"
+          find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' | sort > /tmp/parser_files.txt || true
 
-          if [ -f "$HFILE" ]; then
-            chmod u+w "$HFILE" || true
-            sed -i '/ranges/d' "$HFILE"
-            echo "First 25 lines of $HFILE:"
-            sed -n '1,25p' "$HFILE" || true
-            echo "Remaining ranges lines in $HFILE:"
-            grep -n 'ranges' "$HFILE" || true
-          else
-            echo "Missing $HFILE"
-          fi
+          echo "Parser files found:"
+          cat /tmp/parser_files.txt || true
 
-          if [ -f "$CFILE" ]; then
-            chmod u+w "$CFILE" || true
-            sed -i '/ranges/d' "$CFILE"
-            echo "First 25 lines of $CFILE:"
-            sed -n '1,25p' "$CFILE" || true
-            echo "Remaining ranges lines in $CFILE:"
-            grep -n 'ranges' "$CFILE" || true
-          else
-            echo "Missing $CFILE"
-          fi
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            echo "Patching $f"
+            chmod u+w "$f" || true
+            sed -i '/ranges/d' "$f"
+            echo "Top of $f after patch:"
+            sed -n '1,25p' "$f" || true
+            echo "Remaining ranges lines in $f:"
+            grep -n 'ranges' "$f" || true
+          done < /tmp/parser_files.txt
 
-      - name: Final build
+      - name: Final build with retry
         run: |
           set -eux
-          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
+
+          patch_generated() {
+            find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' | sort > /tmp/parser_files_retry.txt || true
+            echo "Parser files before retry:"
+            cat /tmp/parser_files_retry.txt || true
+
+            while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              echo "Repatching $f"
+              chmod u+w "$f" || true
+              sed -i '/ranges/d' "$f"
+              echo "Top of $f after repatch:"
+              sed -n '1,25p' "$f" || true
+              echo "Remaining ranges lines in $f:"
+              grep -n 'ranges' "$f" || true
+            done < /tmp/parser_files_retry.txt
+          }
+
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main || {
+            echo "Final build failed, retrying after parser patch"
+            patch_generated
+            bazel build --config=android_arm64 //runtime/engine:litert_lm_main
+          }
 
       - name: Collect artifact
         run: |
