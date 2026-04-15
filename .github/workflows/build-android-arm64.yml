@@ -108,56 +108,46 @@ jobs:
           set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
 
-      - name: Patch parser headers if present
+      - name: Patch generated parser headers if present
         run: |
           set -eux
-          PARSER_LIST="$(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' | sort || true)"
 
-          echo "Found parser headers:"
-          if [ -z "$PARSER_LIST" ]; then
-            echo "  <none>"
-            exit 0
-          fi
+          patch_parser_headers() {
+            found=0
+            find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort | while IFS= read -r p; do
+              [ -n "$p" ] || continue
+              found=1
+              rp="$(realpath "$p")"
+              echo "Patching $rp"
+              chmod u+w "$rp" || true
 
-          printf '%s\n' "$PARSER_LIST"
+              sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
+              #include <ranges>\
+              #endif' "$rp"
 
-          for p in $PARSER_LIST; do
-            rp="$(realpath "$p")"
-            echo "Patching $rp"
-            chmod u+w "$rp" || true
+              sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
+              static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
+              #endif' "$rp"
 
-            sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
-            #include <ranges>\
-            #endif' "$rp"
+              sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
+              static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
+              #endif' "$rp"
+            done
 
-            sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
-            static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
-            #endif' "$rp"
+            if ! find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | grep -q .; then
+              echo "No parser headers found yet"
+            fi
+          }
 
-            sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
-            static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
-            #endif' "$rp"
-          done
+          patch_parser_headers
 
       - name: Final build with retry
         run: |
           set -eux
 
-          if bazel build --config=android_arm64 //runtime/engine:litert_lm_main; then
-            exit 0
-          fi
-
-          echo "Final build failed, retrying after parser header patch"
-
-          PARSER_LIST="$(find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' | sort || true)"
-
-          echo "Headers before retry:"
-          if [ -z "$PARSER_LIST" ]; then
-            echo "  <none>"
-          else
-            printf '%s\n' "$PARSER_LIST"
-
-            for p in $PARSER_LIST; do
+          patch_parser_headers() {
+            find bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | sort | while IFS= read -r p; do
+              [ -n "$p" ] || continue
               rp="$(realpath "$p")"
               echo "Repatching $rp"
               chmod u+w "$rp" || true
@@ -174,8 +164,14 @@ jobs:
               static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
               #endif' "$rp"
             done
+          }
+
+          if bazel build --config=android_arm64 //runtime/engine:litert_lm_main; then
+            exit 0
           fi
 
+          echo "Final build failed, retrying after parser header patch"
+          patch_parser_headers
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Collect artifact
