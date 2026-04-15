@@ -56,7 +56,8 @@ jobs:
         uses: bazelbuild/setup-bazelisk@v3
 
       - name: Prefetch target dependencies
-        run: bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
+        run: |
+          bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
 
       - name: Patch nlohmann_json headers
         run: |
@@ -88,12 +89,7 @@ jobs:
           sed -i '/std::ranges::contiguous_range/d' "$REAL_CXX_H"
           sed -i '/std::contiguous_iterator/d' "$REAL_CXX_H"
 
-      - name: First build pass
-        run: |
-          set -eux
-          bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
-
-      - name: Force generate parsers_cpp
+      - name: Generate parser files
         run: |
           set -eux
           bazel build --config=android_arm64 //runtime/components/tool_use/rust:parsers_cpp || true
@@ -102,34 +98,38 @@ jobs:
         run: |
           set -eux
 
-          patch_one() {
-            F="$1"
-            if [ ! -e "$F" ]; then
-              echo "Missing $F"
-              return 0
-            fi
+          HFILE="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
+          CFILE="bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.cc"
 
-            RF="$(realpath "$F")"
-            echo "Patching $F"
-            echo "Real path $RF"
+          if [ -f "$HFILE" ]; then
+            REAL_HFILE="$(realpath "$HFILE")"
+            chmod u+w "$REAL_HFILE" || true
+            sed -i '/#include <ranges>/d' "$REAL_HFILE"
+            sed -i '/std::ranges::contiguous_range/d' "$REAL_HFILE"
+            sed -i '/std::contiguous_iterator/d' "$REAL_HFILE"
+            echo "Top of $REAL_HFILE"
+            sed -n '1,30p' "$REAL_HFILE" || true
+            echo "Remaining ranges lines in $REAL_HFILE"
+            grep -n 'ranges' "$REAL_HFILE" || true
+          else
+            echo "Missing $HFILE"
+            exit 1
+          fi
 
-            chmod u+w "$RF" || true
-
-            sed -i '/#include <ranges>/d' "$RF"
-            sed -i '/std::ranges::contiguous_range/d' "$RF"
-            sed -i '/std::contiguous_iterator/d' "$RF"
-
-            echo "Remaining ranges lines in real file:"
-            grep -n 'ranges' "$RF" || true
-
-            echo "Top of real file:"
-            sed -n '1,25p' "$RF" || true
-          }
-
-          while IFS= read -r F; do
-            [ -n "$F" ] || continue
-            patch_one "$F"
-          done < <(find bazel-out \( -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' \) | sort || true)
+          if [ -f "$CFILE" ]; then
+            REAL_CFILE="$(realpath "$CFILE")"
+            chmod u+w "$REAL_CFILE" || true
+            sed -i '/#include <ranges>/d' "$REAL_CFILE"
+            sed -i '/std::ranges::contiguous_range/d' "$REAL_CFILE"
+            sed -i '/std::contiguous_iterator/d' "$REAL_CFILE"
+            echo "Top of $REAL_CFILE"
+            sed -n '1,30p' "$REAL_CFILE" || true
+            echo "Remaining ranges lines in $REAL_CFILE"
+            grep -n 'ranges' "$REAL_CFILE" || true
+          else
+            echo "Missing $CFILE"
+            exit 1
+          fi
 
       - name: Final build
         run: |
