@@ -108,40 +108,35 @@ jobs:
           set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
 
-      - name: Patch generated parser files if present
+      - name: Patch generated parser files at fixed path if present
         run: |
           set -eux
 
           patch_one() {
             f="$1"
-            [ -f "$f" ] || return 0
-            rf="$(realpath "$f")"
-            echo "Patching $rf"
-            chmod u+w "$rf" || true
+            if [ ! -f "$f" ]; then
+              echo "Missing $f"
+              return 0
+            fi
+
+            echo "Patching $f"
+            chmod u+w "$f" || true
 
             sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
             #include <ranges>\
-            #endif' "$rf"
-
+            #endif' "$f"
+            
             sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
             static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
-            #endif' "$rf"
+            #endif' "$f"
 
             sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
             static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
-            #endif' "$rf"
+            #endif' "$f"
           }
 
-          FOUND=0
-          while IFS= read -r f; do
-            [ -n "$f" ] || continue
-            FOUND=1
-            patch_one "$f"
-          done < <(find bazel-out \( -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' \) | sort || true)
-
-          if [ "$FOUND" -eq 0 ]; then
-            echo "No parser files found yet"
-          fi
+          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
+          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.cc"
 
       - name: Final build with retry
         run: |
@@ -149,22 +144,25 @@ jobs:
 
           patch_one() {
             f="$1"
-            [ -f "$f" ] || return 0
-            rf="$(realpath "$f")"
-            echo "Repatching $rf"
-            chmod u+w "$rf" || true
+            if [ ! -f "$f" ]; then
+              echo "Missing $f"
+              return 0
+            fi
+
+            echo "Repatching $f"
+            chmod u+w "$f" || true
 
             sed -i '/#include <ranges>/c\#if __has_include(<ranges>)\
             #include <ranges>\
-            #endif' "$rf"
+            #endif' "$f"
 
             sed -i '/static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);/c\#if __has_include(<ranges>)\
             static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\
-            #endif' "$rf"
+            #endif' "$f"
 
             sed -i '/static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);/c\#if __has_include(<ranges>)\
             static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\
-            #endif' "$rf"
+            #endif' "$f"
           }
 
           if bazel build --config=android_arm64 //runtime/engine:litert_lm_main; then
@@ -173,16 +171,8 @@ jobs:
 
           echo "Final build failed, retrying after parser file patch"
 
-          FOUND=0
-          while IFS= read -r f; do
-            [ -n "$f" ] || continue
-            FOUND=1
-            patch_one "$f"
-          done < <(find bazel-out \( -path '*/runtime/components/tool_use/rust/parsers.rs.h' -o -path '*/runtime/components/tool_use/rust/parsers.rs.cc' \) | sort || true)
-
-          if [ "$FOUND" -eq 0 ]; then
-            echo "No parser files found before retry"
-          fi
+          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.h"
+          patch_one "bazel-out/arm64-v8a-opt/bin/runtime/components/tool_use/rust/parsers.rs.cc"
 
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main
 
