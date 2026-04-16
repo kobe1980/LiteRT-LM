@@ -331,7 +331,7 @@ http_archive(
     integrity = "sha256-QDmf3b85d2R7//dFPaz/xrVwGxmigqKDNpqHARXQoEk=",
     strip_prefix = "cxxbridge-cmd-1.0.149",
     type = "tar.gz",
-    url = "https://static.crates.io/crates/cxxbridge-cmd/cxxbridge-cmd-1.0.148.crate",
+    url = "https://static.crates.io/crates/cxxbridge-cmd/cxxbridge-cmd-1.0.149.crate",
 )
 
 crates_repository(
