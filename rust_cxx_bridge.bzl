@@ -14,7 +14,6 @@
 
 """Rust cxxbridge rules."""
 
-# [Google-internal load of `cc_library`]
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 def rust_cxx_bridge(name, src, deps = [], visibility = None, crate_features = []):
@@ -45,17 +44,8 @@ def rust_cxx_bridge(name, src, deps = [], visibility = None, crate_features = []
         crate_features = crate_features,
     )
 
-    # This library provides the generated header only.
-    #
-    # The impl library will depend on this.
-    # This allows it to see shared data types, and call `extern "Rust"` functions.
-    #
-    # Should not be exposed publicly: it does not contain the generated thunk code we need to link.
-    # This library exists to avoid a circular dependency between the impl and bridge cc_librarys.
     cc_library(
         name = "%s/include" % name,
-        # Textual: this header necessarily #includes hdrs from the impl library.
-        # We can't depend on that here, because it depends on this!
         textual_hdrs = [out_h],
         visibility = ["//visibility:private"],
     )
@@ -64,9 +54,6 @@ def rust_cxx_bridge(name, src, deps = [], visibility = None, crate_features = []
     if visibility != None:
         kwargs["visibility"] = visibility
 
-    # The public bridge library.
-    #
-    # This exposes the bridge header, and links in the generated thunk code and the impl library.
     cc_library(
         name = name,
         srcs = [out_cc],
@@ -84,12 +71,29 @@ def _run_cxxbridge_cmd_impl(ctx):
         args.append("--cfg")
         args.append("feature=\"%s\"" % f)
 
-    # https://bazel.build/rules/lib/builtins/actions.html#run
-    ctx.actions.run(
+    command = """
+set -eu
+
+"{cxxbridge}" {args}
+
+for f in "$@"; do
+  if [ -f "$f" ]; then
+    sed -i '/#include <ranges>/d' "$f"
+    sed -i '/std::ranges::contiguous_range/d' "$f"
+    sed -i '/std::contiguous_iterator/d' "$f"
+  fi
+done
+""".format(
+        cxxbridge = ctx.executable._cxxbridge.path,
+        args = " ".join(['"%s"' % a for a in args]),
+    )
+
+    ctx.actions.run_shell(
         outputs = ctx.outputs.outs,
-        inputs = ctx.files.srcs,
-        executable = ctx.executable._cxxbridge,
-        arguments = args,
+        inputs = ctx.files.srcs + [ctx.executable._cxxbridge],
+        tools = [ctx.executable._cxxbridge],
+        arguments = [f.path for f in ctx.outputs.outs],
+        command = command,
         mnemonic = "RunCxxbridgeCmd",
     )
 
