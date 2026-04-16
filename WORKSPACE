@@ -328,7 +328,7 @@ crate_repositories()
 http_archive(
     name = "cxxbridge_cmd",
     build_file = "//cxxbridge_cmd:BUILD.cxxbridge_cmd.bazel",
-    integrity = "sha256-KEljLmSVoe7idb4+1ciLQ5M2iWaJPK5LBeW4xydtuGA=",
+    integrity = "sha256-QDmf3b85d2R7//dFPaz/xrVwGxmigqKDNpqHARXQoEk=",
     strip_prefix = "cxxbridge-cmd-1.0.148",
     type = "tar.gz",
     url = "https://static.crates.io/crates/cxxbridge-cmd/cxxbridge-cmd-1.0.148.crate",
