@@ -252,11 +252,11 @@ http_archive(
 
 load("@rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
 
-kotlin_repositories()  # if you want the default. Otherwise see custom kotlinc distribution below
+kotlin_repositories()
 
 load("@rules_kotlin//kotlin:core.bzl", "kt_register_toolchains")
 
-kt_register_toolchains()  # to use the default toolchain, otherwise see toolchains below
+kt_register_toolchains()
 
 # Rust (for HuggingFace Tokenizers)
 http_archive(
@@ -273,7 +273,6 @@ rules_rust_dependencies()
 rust_register_toolchains(
     edition = "2021",
     extra_target_triples = [
-        # Explicitly add toolchains for mobile. Desktop platforms are supported by default.
         "aarch64-linux-android",
         "aarch64-apple-ios",
         "aarch64-apple-ios-sim",
@@ -329,10 +328,10 @@ crate_repositories()
 http_archive(
     name = "cxxbridge_cmd",
     build_file = "//cxxbridge_cmd:BUILD.cxxbridge_cmd.bazel",
-    integrity = "sha256-pf/3kWu94FwtuZRp8J3PryA78lsJbMv052GgR5JBLhA=",
+    integrity = "sha256-KEljLmSVoe7idb4+1ciLQ5M2iWaJPK5LBeW4xydtuGA=",
     strip_prefix = "cxxbridge-cmd-1.0.148",
     type = "tar.gz",
-    url = "https://static.crates.io/crates/cxxbridge-cmd/cxxbridge-cmd-1.0.149.crate",
+    url = "https://static.crates.io/crates/cxxbridge-cmd/cxxbridge-cmd-1.0.148.crate",
 )
 
 crates_repository(
@@ -359,11 +358,8 @@ http_archive(
     name = "sentencepiece",
     build_file = "@//:BUILD.sentencepiece",
     patch_cmds = [
-        # Empty config.h seems enough.
         "touch config.h",
-        # Replace third_party/absl/ with absl/ in *.h and *.cc files.
         "sed -i -e 's|#include \"third_party/absl/|#include \"absl/|g' *.h *.cc",
-        # Replace third_party/darts_clone/ with include/ in *.h and *.cc files.
         "sed -i -e 's|#include \"third_party/darts_clone/|#include \"include/|g' *.h *.cc",
     ],
     patches = ["@//:PATCH.sentencepiece"],
@@ -375,7 +371,6 @@ http_archive(
 http_archive(
     name = "litert",
     patch_cmds = [
-        # Replace @//third_party with @litert//third_party in files under third_party/.
         "sed -i -e 's|\"@//third_party/|\"@litert//third_party/|g' third_party/*/*",
     ],
     sha256 = LITERT_SHA256,
@@ -436,43 +431,28 @@ http_jar(
     url = "https://jcenter.bintray.com/org/glassfish/javax.json/1.0.4/javax.json-1.0.4.jar",
 )
 
-# Android rules. Need latest rules_android_ndk to use NDK 26+.
 load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
 
 android_ndk_repository(name = "androidndk")
 
 android_sdk_repository(name = "androidsdk")
 
-# Configure Android NDK only when ANDROID_NDK_HOME is set.
-# Creates current_android_ndk_env.bzl as a workaround since shell environment is available only
-# through repository rule's context.
 load("//:android_ndk_env.bzl", "check_android_ndk_env")
 
 check_android_ndk_env(name = "android_ndk_env")
 
 load("@android_ndk_env//:current_android_ndk_env.bzl", "ANDROID_NDK_HOME_IS_SET")
 
-# Use "@android_ndk_env//:all" as a dummy toolchain target as register_toolchains() does not take
-# an empty string.
 register_toolchains("@androidndk//:all" if ANDROID_NDK_HOME_IS_SET else "@android_ndk_env//:all")
 
-# VENDOR SDKS ######################################################################################
-
-# QUALCOMM ---------------------------------------------------------------------------------------
-
-# The actual macro call will be set during configure for now.
 load("@litert//third_party/qairt:workspace.bzl", "qairt")
 
 qairt()
 
-# MEDIATEK ---------------------------------------------------------------------------------------
-
-# Currently only works with local sdk
 load("@litert//third_party/neuro_pilot:workspace.bzl", "neuro_pilot")
 
 neuro_pilot()
 
-# GOOGLE TENSOR ----------------------------------------------------------------------------------
 load("@litert//third_party/google_tensor:workspace.bzl", "google_tensor")
 
 google_tensor()
