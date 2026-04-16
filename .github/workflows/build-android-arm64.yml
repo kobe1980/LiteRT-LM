@@ -48,6 +48,34 @@ jobs:
           CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
           rm -f src/lib.rs
 
+      - name: Prefetch target dependencies
+        run: |
+          bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
+
+      - name: Patch external cxx.h
+        run: |
+          set -eux
+          OUTPUT_BASE="$(bazel info output_base)"
+          CXX_H="$(find "$OUTPUT_BASE/external" -path '*/crate_index__cxx-*/include/cxx.h' | head -n 1)"
+
+          echo "CXX_H=$CXX_H"
+
+          test -n "$CXX_H"
+          test -f "$CXX_H"
+
+          REAL_CXX_H="$(realpath "$CXX_H")"
+          chmod u+w "$REAL_CXX_H" || true
+
+          sed -i '/#include <ranges>/d' "$REAL_CXX_H"
+          sed -i '/std::ranges::contiguous_range/d' "$REAL_CXX_H"
+          sed -i '/std::contiguous_iterator/d' "$REAL_CXX_H"
+
+          echo "Top of patched cxx.h:"
+          sed -n '1,40p' "$REAL_CXX_H" || true
+
+          echo "Remaining ranges lines in cxx.h:"
+          grep -n 'ranges' "$REAL_CXX_H" || true
+
       - name: Build litert_lm_main for Android ARM64
         run: |
           set -eux
