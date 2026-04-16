@@ -18,6 +18,18 @@ jobs:
       - name: Pull Git LFS files
         run: git lfs pull
 
+      - name: Patch gemma3_data_processor.cc
+        run: |
+          set -eux
+          FILE="runtime/conversation/model_data_processor/gemma3_data_processor.cc"
+          sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
+
+      - name: Patch gemma4_data_processor.cc
+        run: |
+          set -eux
+          FILE="runtime/conversation/model_data_processor/gemma4_data_processor.cc"
+          sed -i 's/prompt_view.data() - part.size()/prompt_view.data() - start/g' "$FILE"
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -40,6 +52,13 @@ jobs:
 
       - name: Set up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Repin Rust crate lockfiles
+        run: |
+          set -eux
+          touch src/lib.rs
+          CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+          rm -f src/lib.rs
 
       - name: Build litert_lm_main for Android ARM64
         run: |
