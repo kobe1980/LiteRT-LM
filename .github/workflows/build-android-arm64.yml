@@ -52,6 +52,30 @@ jobs:
         run: |
           bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
 
+      - name: Patch nlohmann_json headers
+        run: |
+          set -eux
+          OUTPUT_BASE="$(bazel info output_base)"
+          TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
+          FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
+
+          echo "TO_JSON=$TO_JSON"
+          echo "FROM_JSON=$FROM_JSON"
+
+          test -n "$TO_JSON"
+          test -n "$FROM_JSON"
+          test -f "$TO_JSON"
+          test -f "$FROM_JSON"
+
+          sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$TO_JSON"
+          sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$FROM_JSON"
+
+          echo "Patched to_json.hpp:"
+          grep -n 'JSON_HAS_FILESYSTEM\|JSON_HAS_EXPERIMENTAL_FILESYSTEM\|disabled for Android NDK filesystem' "$TO_JSON" || true
+
+          echo "Patched from_json.hpp:"
+          grep -n 'JSON_HAS_FILESYSTEM\|JSON_HAS_EXPERIMENTAL_FILESYSTEM\|disabled for Android NDK filesystem' "$FROM_JSON" || true
+
       - name: Patch external cxx.h
         run: |
           set -eux
