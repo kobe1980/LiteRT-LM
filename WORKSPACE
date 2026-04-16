@@ -330,7 +330,7 @@ http_archive(
     name = "cxxbridge_cmd",
     build_file = "//cxxbridge_cmd:BUILD.cxxbridge_cmd.bazel",
     integrity = "sha256-pf/3kWu94FwtuZRp8J3PryA78lsJbMv052GgR5JBLhA=",
-    strip_prefix = "cxxbridge-cmd-1.0.149",
+    strip_prefix = "cxxbridge-cmd-1.0.148",
     type = "tar.gz",
     url = "https://static.crates.io/crates/cxxbridge-cmd/cxxbridge-cmd-1.0.149.crate",
 )
