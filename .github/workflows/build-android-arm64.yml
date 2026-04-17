@@ -104,7 +104,13 @@ jobs:
         run: |
           set -eux
           bazel build --config=android_arm64 //runtime/engine:litert_lm_main
-
+      
+      - name: Inspect built shared libs
+        run: |
+          set -eux
+          find bazel-bin -type f | grep -E 'GemmaModelConstraintProvider|ConstraintProvider|\.so$' || true
+          find bazel-out -type f | grep -E 'GemmaModelConstraintProvider|ConstraintProvider|\.so$' || true
+      
       - name: Collect artifact
         run: |
           set -eux
@@ -116,12 +122,6 @@ jobs:
 
           ls -lh out
           file out/litert_lm_main || true
-          
-      - name: Inspect built shared libs
-        run: |
-          set -eux
-          find bazel-bin -type f | grep -E 'GemmaModelConstraintProvider|ConstraintProvider|\.so$' || true
-          find bazel-out -type f | grep -E 'GemmaModelConstraintProvider|ConstraintProvider|\.so$' || true
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
