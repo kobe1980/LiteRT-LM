@@ -107,8 +107,13 @@ jobs:
 
       - name: Collect artifact
         run: |
+          set -eux
           mkdir -p out
-          cp -f bazel-bin/runtime/engine/litert_lm_main out/litert_lm_main
+
+          cp -f bazel-bin/runtime/engine/litert_lm_main out/
+
+          find bazel-bin -type f -name '*.so' -exec cp -f {} out/ \;
+
           ls -lh out
           file out/litert_lm_main || true
 
@@ -116,4 +121,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: litert-lm-android-arm64
-          path: out/litert_lm_main
+          path: out/
