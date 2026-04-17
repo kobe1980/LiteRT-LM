@@ -9,36 +9,14 @@ jobs:
     timeout-minutes: 180
 
     steps:
-      - name: Checkout upstream LiteRT-LM
+      - name: Checkout current repository
         uses: actions/checkout@v4
         with:
-          repository: google-ai-edge/LiteRT-LM
-          ref: v0.10.1
           lfs: true
           submodules: recursive
 
       - name: Pull Git LFS files
         run: git lfs pull
-
-      - name: Patch WORKSPACE minizip checksum
-        run: |
-          set -eux
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("WORKSPACE")
-          text = path.read_text()
-
-          old = 'sha256 = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"'
-          new = 'sha256 = "3bd1b9f53b217989e8aa250faa3506dd4fd259fa34830cc70f0d63ca0657a5f5"'
-
-          if old not in text:
-              raise SystemExit("expected minizip sha256 not found in WORKSPACE")
-
-          text = text.replace(old, new, 1)
-          path.write_text(text)
-          print("patched WORKSPACE minizip sha256")
-          PY
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -56,23 +34,28 @@ jobs:
 
       - name: Set Android env
         run: |
-          echo "ANDROID_SDK_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "ANDROID_SDK_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> "$GITHUB_ENV"
 
       - name: Set up Bazelisk
         uses: bazelbuild/setup-bazelisk@v3
+
+      - name: Repin Rust crate lockfiles
+        run: |
+          set -eux
+          touch src/lib.rs
+          CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+          rm -f src/lib.rs
 
       - name: Prefetch target dependencies
         run: |
           bazel fetch --config=android_arm64 //runtime/engine:litert_lm_main
 
-      - name: Locate and patch nlohmann_json headers
+      - name: Patch nlohmann_json headers
         run: |
           set -eux
-
           OUTPUT_BASE="$(bazel info output_base)"
-
           TO_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/to_json.hpp' | head -n 1)"
           FROM_JSON="$(find "$OUTPUT_BASE/external" -path '*/nlohmann_json*/include/nlohmann/detail/conversions/from_json.hpp' | head -n 1)"
 
@@ -84,25 +67,18 @@ jobs:
           test -f "$TO_JSON"
           test -f "$FROM_JSON"
 
-          python3 - "$TO_JSON" "$FROM_JSON" <<'PY'
-          import sys
-          from pathlib import Path
+          sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$TO_JSON"
+          sed -i '0,/#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM/s//#if 0 \/* disabled for Android NDK filesystem\/char8_t compatibility *\//' "$FROM_JSON"
 
-          for raw in sys.argv[1:]:
-              path = Path(raw)
-              text = path.read_text()
-              text = text.replace(
-                  "#if JSON_HAS_FILESYSTEM || JSON_HAS_EXPERIMENTAL_FILESYSTEM",
-                  "#if 0 /* disabled for Android NDK filesystem/char8_t compatibility */"
-              )
-              path.write_text(text)
-              print(f"patched {path}")
-          PY
+          echo "Patched to_json.hpp:"
+          grep -n 'JSON_HAS_FILESYSTEM\|JSON_HAS_EXPERIMENTAL_FILESYSTEM\|disabled for Android NDK filesystem' "$TO_JSON" || true
 
-      - name: Locate and patch cxx.h
+          echo "Patched from_json.hpp:"
+          grep -n 'JSON_HAS_FILESYSTEM\|JSON_HAS_EXPERIMENTAL_FILESYSTEM\|disabled for Android NDK filesystem' "$FROM_JSON" || true
+
+      - name: Patch external cxx.h
         run: |
           set -eux
-
           OUTPUT_BASE="$(bazel info output_base)"
           CXX_H="$(find "$OUTPUT_BASE/external" -path '*/crate_index__cxx-*/include/cxx.h' | head -n 1)"
 
@@ -111,99 +87,30 @@ jobs:
           test -n "$CXX_H"
           test -f "$CXX_H"
 
-          python3 - "$CXX_H" <<'PY'
-          import sys
-          from pathlib import Path
+          REAL_CXX_H="$(realpath "$CXX_H")"
+          chmod u+w "$REAL_CXX_H" || true
 
-          path = Path(sys.argv[1])
-          text = path.read_text()
+          sed -i '/#include <ranges>/d' "$REAL_CXX_H"
+          sed -i '/std::ranges::contiguous_range/d' "$REAL_CXX_H"
+          sed -i '/std::contiguous_iterator/d' "$REAL_CXX_H"
 
-          if "#include <ranges>" not in text:
-              raise SystemExit("expected '#include <ranges>' not found in cxx.h")
+          echo "Top of patched cxx.h:"
+          sed -n '1,40p' "$REAL_CXX_H" || true
 
-          text = text.replace(
-              "#include <ranges>",
-              "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-              1,
-          )
+          echo "Remaining ranges lines in cxx.h:"
+          grep -n 'ranges' "$REAL_CXX_H" || true
 
-          text = text.replace(
-              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-          )
-
-          text = text.replace(
-              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-          )
-
-          path.write_text(text)
-          print(f"patched {path}")
-          PY
-
-      - name: First build pass to generate bridge headers
+      - name: Build litert_lm_main for Android ARM64
         run: |
           set -eux
-          bazel build --config=android_arm64 //runtime/engine:litert_lm_main || true
-
-      - name: Locate and patch generated parsers.rs.h
+          bazel build --config=android_arm64 //runtime/engine:litert_lm_main
+      
+      - name: Inspect built shared libs
         run: |
           set -eux
-
-          PARSERS_H="$(find . bazel-out -path '*/runtime/components/tool_use/rust/parsers.rs.h' 2>/dev/null | head -n 1)"
-
-          echo "PARSERS_H=$PARSERS_H"
-
-          test -n "$PARSERS_H"
-          test -f "$PARSERS_H"
-
-          python3 - "$PARSERS_H" <<'PY'
-          import sys
-          from pathlib import Path
-
-          path = Path(sys.argv[1])
-          text = path.read_text()
-
-          if "#include <ranges>" in text:
-              text = text.replace(
-                  "#include <ranges>",
-                  "#if __has_include(<ranges>)\n#include <ranges>\n#endif",
-                  1,
-              )
-
-          text = text.replace(
-              "static_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::ranges::contiguous_range<rust::Slice<const uint8_t>>);\n#endif",
-          )
-
-          text = text.replace(
-              "static_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);",
-              "#if __has_include(<ranges>)\nstatic_assert(std::contiguous_iterator<rust::Slice<const uint8_t>::iterator>);\n#endif",
-          )
-
-          path.write_text(text)
-          print(f"patched {path}")
-          PY
-
-      - name: Final build litert_lm_main for Android ARM64
-        run: |
-          bazel build \
-            --config=android_arm64 \
-            //runtime/engine:litert_lm_main
-
-      - name: Inspect runfiles and Gemma provider
-        run: |
-          set -eux
-
-          echo "=== direct search, all file types ==="
-          find bazel-bin bazel-out . -name 'libGemmaModelConstraintProvider.so' -print -ls || true
-
-          echo "=== runfiles dirs ==="
-          find bazel-bin -name '*.runfiles' -print | head -n 50 || true
-
-          echo "=== grep provider in manifests / symlink trees ==="
-          grep -R "GemmaModelConstraintProvider" bazel-bin bazel-out . 2>/dev/null | head -n 100 || true
-
+          find bazel-bin -type f | grep -E 'GemmaModelConstraintProvider|ConstraintProvider|\.so$' || true
+          find bazel-out -type f | grep -E 'GemmaModelConstraintProvider|ConstraintProvider|\.so$' || true
+      
       - name: Collect artifact
         run: |
           set -eux
@@ -211,23 +118,11 @@ jobs:
 
           cp -f bazel-bin/runtime/engine/litert_lm_main out/
 
-          PROVIDER_SO="$(find bazel-bin bazel-out . -name 'libGemmaModelConstraintProvider.so' | head -n 1 || true)"
-          echo "PROVIDER_SO=$PROVIDER_SO"
+          find bazel-bin -type f -name '*.so' -exec cp -f {} out/ \;
 
-          if [ -n "$PROVIDER_SO" ]; then
-            cp -L "$PROVIDER_SO" out/
-          fi
-
-          RUNFILES_DIR="bazel-bin/runtime/engine/litert_lm_main.runfiles"
-          if [ -d "$RUNFILES_DIR" ]; then
-            mkdir -p out/runfiles
-            cp -aL "$RUNFILES_DIR"/. out/runfiles/
-          fi
-
-          ls -R out | head -n 300 || true
           ls -lh out
           file out/litert_lm_main || true
-
+      
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
