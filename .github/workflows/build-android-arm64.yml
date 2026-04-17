@@ -126,27 +126,27 @@ jobs:
       
        - name: Collect artifact
          run: |
-           set -eux
-           mkdir -p out
+          set -eux
+          mkdir -p out
 
-           cp -f bazel-bin/runtime/engine/litert_lm_main out/
+          cp -f bazel-bin/runtime/engine/litert_lm_main out/
 
-           PROVIDER_SO="$(find bazel-bin bazel-out . -name 'libGemmaModelConstraintProvider.so' | head -n 1 || true)"
-           echo "PROVIDER_SO=$PROVIDER_SO"
+          PROVIDER_SO="$(find bazel-bin bazel-out . -name 'libGemmaModelConstraintProvider.so' | head -n 1 || true)"
+          echo "PROVIDER_SO=$PROVIDER_SO"
 
-           if [ -n "$PROVIDER_SO" ]; then
-             cp -L "$PROVIDER_SO" out/
-           fi
+          if [ -n "$PROVIDER_SO" ]; then
+            cp -L "$PROVIDER_SO" out/
+          fi
 
-           RUNFILES_DIR="bazel-bin/runtime/engine/litert_lm_main.runfiles"
-           if [ -d "$RUNFILES_DIR" ]; then
-             mkdir -p out/runfiles
-             cp -aL "$RUNFILES_DIR"/. out/runfiles/
-           fi
+          RUNFILES_DIR="bazel-bin/runtime/engine/litert_lm_main.runfiles"
+          if [ -d "$RUNFILES_DIR" ]; then
+            mkdir -p out/runfiles
+            cp -aL "$RUNFILES_DIR"/. out/runfiles/
+          fi
 
-           ls -R out | head -n 200 || true
-           ls -lh out
-           file out/litert_lm_main || true
+          ls -R out | head -n 200 || true
+          ls -lh out
+          file out/litert_lm_main || true
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
