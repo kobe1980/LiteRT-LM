@@ -289,7 +289,7 @@ Gemma3DataProcessor::ToInputDataVectorImpl(
   // while for Gemma3 the placeholders in the prompt are <start_of_image> and
   // <start_of_audio>.
   while (RE2::FindAndConsume(&prompt_view, re_delimiter, &part)) {
-    absl::string_view text_part(start, prompt_view.data() - part.size());
+    absl::string_view text_part(start, prompt_view.data() - start - part.size());
     start = prompt_view.data();
     if (IsImage(part)) {
       input_data.emplace_back(
