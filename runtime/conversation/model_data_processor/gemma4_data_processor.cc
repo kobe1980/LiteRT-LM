@@ -372,7 +372,7 @@ Gemma4DataProcessor::ToInputDataVectorImpl(
       .max_num_patches = config_.max_num_patches});
   // Replace the placeholders with the actual data.
   while (RE2::FindAndConsume(&prompt_view, re_delimiter, &part)) {
-    absl::string_view text_part(start, prompt_view.data() - part.size());
+    absl::string_view text_part(start, prompt_view.data() - start - part.size());
     start = prompt_view.data();
     if (IsImage(part)) {
       // Vision modality needs double newlines before image soft token.
